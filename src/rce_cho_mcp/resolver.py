@@ -1,15 +1,8 @@
-from rdflib import Graph, URIRef
-
-from rce_cho_mcp.sparql import SPARQL_ENDPOINT
+from rce_cho_mcp.sparql import execute_sparql
 
 
-PREFIXES = """
-PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
+PREFIXES = """PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-
 """
 
 
@@ -26,16 +19,10 @@ WHERE {{
 LIMIT 1
 """
 
-    graph = Graph()
-    result = graph.query(
-        query,
-        initNs={},
-        service=SPARQL_ENDPOINT,
-    )
+    data = execute_sparql(query)
+    bindings = data.get("results", {}).get("bindings", [])
 
-    for row in result:
-        concept = row.get("concept")
-        if isinstance(concept, URIRef):
-            return str(concept)
+    if not bindings:
+        return None
 
-    return None
+    return bindings[0]["concept"]["value"]
