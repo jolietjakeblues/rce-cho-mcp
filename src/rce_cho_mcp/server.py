@@ -4,6 +4,7 @@ from mcp.server.fastmcp import FastMCP
 
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
+from rce_cho_mcp.ontology.registry import get_classes, get_properties
 
 
 mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
@@ -14,6 +15,24 @@ def ping() -> str:
     """Test of de MCP-server bereikbaar is."""
     return "RCE CHO MCP werkt."
 
+@mcp.tool()
+def ontology_summary() -> str:
+    """Geef een korte samenvatting van de ingelezen CEO-ontologie."""
+    classes = get_classes()
+    properties = get_properties()
+
+    return (
+        f"CEO-ontologie geladen.\n"
+        f"Classes: {len(classes)}\n"
+        f"Properties: {len(properties)}\n\n"
+        f"Eerste classes:\n"
+        + "\n".join(f"- {name}" for name in list(classes)[:10])
+    )
+
+@mcp.tool()
+def ontology_describe_class(class_name: str) -> str:
+    """Beschrijf een CEO-class op basis van de ingelezen ontologie."""
+    return describe_class(class_name)
 
 @mcp.tool()
 def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
