@@ -1,14 +1,13 @@
 import json
-import os
 import urllib.parse
 import urllib.request
+from rce_cho_mcp.config import SPARQL_ENDPOINT, USER_AGENT
 
 
-SPARQL_ENDPOINT = os.getenv(
-    "SPARQL_ENDPOINT",
-    "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql",
-)
-
+# SPARQL_ENDPOINT = os.getenv(
+#    "SPARQL_ENDPOINT",
+#    "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql",
+#)
 
 def execute_sparql(query: str, timeout: int = 30) -> dict:
     params = urllib.parse.urlencode({"query": query})
@@ -18,7 +17,7 @@ def execute_sparql(query: str, timeout: int = 30) -> dict:
         url,
         headers={
             "Accept": "application/sparql-results+json",
-            "User-Agent": "rce-cho-mcp/0.1.0",
+            "User-Agent": USER_AGENT,
         },
     )
 
