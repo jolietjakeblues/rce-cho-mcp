@@ -9,7 +9,8 @@ authors = [
   { name = "Joop" }
 ]
 dependencies = [
-  "mcp>=1.0.0"
+  "mcp>=1.0.0",
+  "rdflib>=7.0.0"
 ]
 
 [project.scripts]
