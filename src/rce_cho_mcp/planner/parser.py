@@ -1,5 +1,5 @@
 from rce_cho_mcp.planner.models import QueryPlan
-
+import re
 
 def parse_question(question: str) -> QueryPlan:
     """Parse a simple Dutch heritage question into a QueryPlan."""
@@ -18,8 +18,10 @@ def parse_question(question: str) -> QueryPlan:
 
     filters = {}
 
-    if "zeist" in q:
-        filters["gemeente"] = "Zeist"
+    match = re.search(r"\bin\s+([A-Za-zÀ-ÿ' -]+)\??$", question.strip())
+    if match:
+    plaats = match.group(1).strip()
+    filters["gemeente"] = plaats
 
     return QueryPlan(
         intent=intent,

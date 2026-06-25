@@ -1,12 +1,20 @@
 from rce_cho_mcp.builder.builder import build_sparql
 from rce_cho_mcp.planner.parser import parse_question
+from rce_cho_mcp.resolver import resolve_label
 from rce_cho_mcp.sparql import execute_sparql, format_results
 from rce_cho_mcp.validator import validate_sparql
 
 
 def answer_question(question: str, max_rows: int = 100) -> str:
-    """Run the full question pipeline: plan, build, validate, execute."""
+    """Run the full question pipeline: plan, resolve, build, validate, execute."""
     plan = parse_question(question)
+
+    if "gemeente" in plan.filters:
+        gemeente_uri = resolve_label(plan.filters["gemeente"], graph_name="owms")
+        if gemeente_uri is None:
+            return f"Gemeente niet gevonden in OWMS: {plan.filters['gemeente']}"
+        plan.filters["gemeente_uri"] = gemeente_uri
+
     query = build_sparql(plan)
 
     errors, warnings = validate_sparql(query)
