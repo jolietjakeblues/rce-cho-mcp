@@ -10,6 +10,7 @@ from rce_cho_mcp.ontology.api import (
     get_classes,
     get_properties,
     search_ontology,
+    statistics,
 )
 
 mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
@@ -19,6 +20,16 @@ mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
 def ping() -> str:
     """Test of de MCP-server bereikbaar is."""
     return "RCE CHO MCP werkt."
+
+@mcp.tool()
+def ontology_statistics() -> str:
+    """Geef statistieken over de ingelezen CEO-ontologie."""
+    stats = statistics()
+    return (
+        "CEO-ontologie geladen.\n"
+        f"Classes: {stats['classes']}\n"
+        f"Properties: {stats['properties']}"
+    )
 
 @mcp.tool()
 def ontology_summary() -> str:

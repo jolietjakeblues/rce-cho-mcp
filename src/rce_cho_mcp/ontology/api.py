@@ -20,3 +20,11 @@ def statistics() -> dict[str, int]:
         "classes": len(get_classes()),
         "properties": len(get_properties()),
     }
+
+def list_classes() -> list[str]:
+    """Return all ontology class names."""
+    return sorted(get_classes().keys())
+
+def list_properties() -> list[str]:
+    """Return all ontology property names."""
+    return sorted(get_properties().keys())
