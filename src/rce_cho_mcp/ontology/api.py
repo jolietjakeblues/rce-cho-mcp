@@ -13,3 +13,10 @@ __all__ = [
     "get_properties",
     "search_ontology",
 ]
+
+def statistics() -> dict[str, int]:
+    """Return basic ontology statistics."""
+    return {
+        "classes": len(get_classes()),
+        "properties": len(get_properties()),
+    }
