@@ -1,0 +1,20 @@
+[project]
+name = "rce-cho-mcp"
+version = "0.1.0"
+description = "MCP server for querying the Dutch RCE Cultural Heritage Objects linked data endpoint"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "EUPL-1.2" }
+authors = [
+  { name = "Joop" }
+]
+dependencies = [
+  "mcp>=1.0.0"
+]
+
+[project.scripts]
+rce-cho-mcp = "rce_cho_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
