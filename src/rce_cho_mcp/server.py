@@ -5,6 +5,8 @@ from rce_cho_mcp.planner.parser import parse_question
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.builder.builder import build_sparql
 from rce_cho_mcp.planner.parser import parse_question
+from rce_cho_mcp.validator import format_validation_report
+from rce_cho_mcp.pipeline import answer_question
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
 from rce_cho_mcp.ontology.api import (
     describe_class,
@@ -40,6 +42,11 @@ def build_query(question: str) -> str:
     return build_sparql(plan)
 
 @mcp.tool()
+def validate_query(sparql_query: str) -> str:
+    """Valideer een SPARQL-query zonder deze uit te voeren."""
+    return format_validation_report(sparql_query)
+
+@mcp.tool()
 def plan_question(question: str) -> str:
     """Maak een eerste QueryPlan voor een Nederlandse erfgoedvraag."""
     plan = parse_question(question)
@@ -49,6 +56,11 @@ def plan_question(question: str) -> str:
         f"Filters: {plan.filters}\n"
         f"Output: {plan.output}"
     )
+
+@mcp.tool()
+def answer_heritage_question(question: str, max_rows: int = 100) -> str:
+    """Beantwoord een erfgoedvraag via de volledige pipeline: plan, build, validate, execute."""
+    return answer_question(question, max_rows=max_rows)
 
 @mcp.tool()
 def ontology_summary() -> str:
