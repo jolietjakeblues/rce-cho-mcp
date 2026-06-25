@@ -1,4 +1,4 @@
-from rce_cho_mcp.planner.models import QueryPlan
+from reference_client.planner.models import QueryPlan
 import re
 
 def parse_question(question: str) -> QueryPlan:

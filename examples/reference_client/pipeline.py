@@ -1,5 +1,5 @@
-from rce_cho_mcp.builder.builder import build_sparql
-from rce_cho_mcp.planner.parser import parse_question
+from reference_client.builder.builder import build_sparql
+from reference_client.planner.parser import parse_question
 from rce_cho_mcp.resolver import resolve_label
 from rce_cho_mcp.sparql import execute_sparql, format_results
 from rce_cho_mcp.validator import validate_sparql

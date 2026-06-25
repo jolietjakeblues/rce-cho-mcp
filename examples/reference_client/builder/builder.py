@@ -1,5 +1,5 @@
 from rce_cho_mcp.config import DEFAULT_GRAPH
-from rce_cho_mcp.planner.models import QueryPlan
+from reference_client.planner.models import QueryPlan
 
 
 def build_sparql(plan: QueryPlan) -> str:

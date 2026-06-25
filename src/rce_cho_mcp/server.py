@@ -1,19 +1,13 @@
 import urllib.error
 
 from mcp.server.fastmcp import FastMCP
-from rce_cho_mcp.planner.parser import parse_question
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
-from rce_cho_mcp.builder.builder import build_sparql
-from rce_cho_mcp.planner.parser import parse_question
 from rce_cho_mcp.validator import format_validation_report
-from rce_cho_mcp.pipeline import answer_question
-from rce_cho_mcp.resolver import resolve_label
+from rce_cho_mcp.resolver import describe_resource, resolve_label
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
 from rce_cho_mcp.ontology.api import (
     describe_class,
     describe_property,
-    get_classes,
-    get_properties,
     search_ontology,
     statistics,
 )
@@ -26,6 +20,7 @@ def ping() -> str:
     """Test of de MCP-server bereikbaar is."""
     return "RCE CHO MCP werkt."
 
+
 @mcp.tool()
 def ontology_statistics() -> str:
     """Geef statistieken over de ingelezen CEO-ontologie."""
@@ -36,71 +31,64 @@ def ontology_statistics() -> str:
         f"Properties: {stats['properties']}"
     )
 
-@mcp.tool()
-def build_query(question: str) -> str:
-    """Maak SPARQL op basis van een Nederlandse erfgoedvraag."""
-    plan = parse_question(question)
-    return build_sparql(plan)
-
-@mcp.tool()
-def validate_query(sparql_query: str) -> str:
-    """Valideer een SPARQL-query zonder deze uit te voeren."""
-    return format_validation_report(sparql_query)
-
-@mcp.tool()
-def plan_question(question: str) -> str:
-    """Maak een eerste QueryPlan voor een Nederlandse erfgoedvraag."""
-    plan = parse_question(question)
-    return (
-        f"Intent: {plan.intent}\n"
-        f"Entity: {plan.entity}\n"
-        f"Filters: {plan.filters}\n"
-        f"Output: {plan.output}"
-    )
-
-@mcp.tool()
-def answer_heritage_question(question: str, max_rows: int = 100) -> str:
-    """Beantwoord een erfgoedvraag via de volledige pipeline: plan, build, validate, execute."""
-    return answer_question(question, max_rows=max_rows)
-
-@mcp.tool()
-def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl") -> str:
-    """Resolveer een SKOS prefLabel naar een concept-URI in een named graph."""
-    uri = resolve_label(label, graph_name=graph_name, lang=lang)
-
-    if uri is None:
-        return f"Geen concept gevonden voor label '{label}' in graph:{graph_name}."
-
-    return uri
-
-@mcp.tool()
-def ontology_summary() -> str:
-    """Geef een korte samenvatting van de ingelezen CEO-ontologie."""
-    classes = get_classes()
-    properties = get_properties()
-
-    return (
-        f"CEO-ontologie geladen.\n"
-        f"Classes: {len(classes)}\n"
-        f"Properties: {len(properties)}\n\n"
-        f"Eerste classes:\n"
-        + "\n".join(f"- {name}" for name in list(classes)[:10])
-    )
-
-@mcp.tool()
-def ontology_describe_class(class_name: str) -> str:
-    """Beschrijf een CEO-class op basis van de ingelezen ontologie."""
-    return describe_class(class_name)
 
 @mcp.tool()
 def ontology_search(term: str) -> str:
     """Zoek classes en properties in de CEO-ontologie."""
     return search_ontology(term)
 
+
+@mcp.tool()
+def ontology_describe_class(class_name: str) -> str:
+    """Beschrijf een CEO-class op basis van de ingelezen ontologie."""
+    return describe_class(class_name)
+
+
 @mcp.tool()
 def ontology_describe_property(property_name: str) -> str:
     """Beschrijf een CEO-property op basis van de ingelezen ontologie."""
     return describe_property(property_name)
+
+
+@mcp.tool()
+def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl") -> str:
+    """Resolveer een SKOS prefLabel naar concept-URI's in een named graph.
+
+    Geeft alle matches terug (URI + rdf:type). De client kiest welke
+    relevant is — de resolver kiest niet zelf.
+    """
+    matches = resolve_label(label, graph_name=graph_name, lang=lang)
+
+    if not matches:
+        return f"Geen concept gevonden voor label '{label}' in graph:{graph_name}."
+
+    lines = [f"{len(matches)} match(es) gevonden voor '{label}' in graph:{graph_name}:"]
+    for match in matches:
+        types = ", ".join(match["types"]) if match["types"] else "onbekend"
+        lines.append(f"- {match['uri']} (type: {types})")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def describe_resource_uri(uri: str) -> str:
+    """Beschrijf een resource: alle predicaten en waarden van een URI in de RCE-graph."""
+    facts = describe_resource(uri)
+
+    if not facts:
+        return f"Geen gegevens gevonden voor resource: {uri}"
+
+    lines = [f"{len(facts)} eigenschap(pen) gevonden voor {uri}:"]
+    lines.extend(f"- {fact['predicate']} -> {fact['object']}" for fact in facts)
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def validate_query(sparql_query: str) -> str:
+    """Valideer een SPARQL-query zonder deze uit te voeren."""
+    return format_validation_report(sparql_query)
+
 
 @mcp.tool()
 def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
