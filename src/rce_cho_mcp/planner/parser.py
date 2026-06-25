@@ -18,7 +18,12 @@ def parse_question(question: str) -> QueryPlan:
 
     filters = {}
 
-    match = re.search(r"\bin\s+([A-Za-zÀ-ÿ' -]+)\??$", question.strip())
+    provincie_match = re.search(r"\bprovincie\s+([A-Za-zÀ-ÿ' -]+)\??$", question.strip(), re.IGNORECASE)
+    if provincie_match:
+        provincie = provincie_match.group(1).strip()
+        filters["provincie"] = provincie
+    else:
+        match = re.search(r"\bin\s+([A-Za-zÀ-ÿ' -]+)\??$", question.strip())
     if match:
         plaats = match.group(1).strip()
         filters["gemeente"] = plaats

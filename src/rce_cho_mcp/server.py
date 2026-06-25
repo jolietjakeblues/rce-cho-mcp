@@ -7,6 +7,7 @@ from rce_cho_mcp.builder.builder import build_sparql
 from rce_cho_mcp.planner.parser import parse_question
 from rce_cho_mcp.validator import format_validation_report
 from rce_cho_mcp.pipeline import answer_question
+from rce_cho_mcp.resolver import resolve_label
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
 from rce_cho_mcp.ontology.api import (
     describe_class,
@@ -61,6 +62,16 @@ def plan_question(question: str) -> str:
 def answer_heritage_question(question: str, max_rows: int = 100) -> str:
     """Beantwoord een erfgoedvraag via de volledige pipeline: plan, build, validate, execute."""
     return answer_question(question, max_rows=max_rows)
+
+@mcp.tool()
+def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl") -> str:
+    """Resolveer een SKOS prefLabel naar een concept-URI in een named graph."""
+    uri = resolve_label(label, graph_name=graph_name, lang=lang)
+
+    if uri is None:
+        return f"Geen concept gevonden voor label '{label}' in graph:{graph_name}."
+
+    return uri
 
 @mcp.tool()
 def ontology_summary() -> str:
