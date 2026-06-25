@@ -4,8 +4,7 @@ from mcp.server.fastmcp import FastMCP
 
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
-from rce_cho_mcp.ontology.registry import get_classes, get_properties
-
+from rce_cho_mcp.ontology.registry import get_classes, get_properties, describe_class
 
 mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
 
