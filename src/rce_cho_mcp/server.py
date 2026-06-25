@@ -1,8 +1,10 @@
 import urllib.error
 
 from mcp.server.fastmcp import FastMCP
-
+from rce_cho_mcp.planner.parser import parse_question
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
+from rce_cho_mcp.builder.builder import build_sparql
+from rce_cho_mcp.planner.parser import parse_question
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
 from rce_cho_mcp.ontology.api import (
     describe_class,
@@ -29,6 +31,23 @@ def ontology_statistics() -> str:
         "CEO-ontologie geladen.\n"
         f"Classes: {stats['classes']}\n"
         f"Properties: {stats['properties']}"
+    )
+
+@mcp.tool()
+def build_query(question: str) -> str:
+    """Maak SPARQL op basis van een Nederlandse erfgoedvraag."""
+    plan = parse_question(question)
+    return build_sparql(plan)
+
+@mcp.tool()
+def plan_question(question: str) -> str:
+    """Maak een eerste QueryPlan voor een Nederlandse erfgoedvraag."""
+    plan = parse_question(question)
+    return (
+        f"Intent: {plan.intent}\n"
+        f"Entity: {plan.entity}\n"
+        f"Filters: {plan.filters}\n"
+        f"Output: {plan.output}"
     )
 
 @mcp.tool()
