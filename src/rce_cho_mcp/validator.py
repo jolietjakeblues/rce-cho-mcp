@@ -18,7 +18,6 @@ FORBIDDEN_PROPERTIES = [
     "ceox:heeftProvincie",
     "ceox:heeftAdresgegevens",
     "ceo:heeftPlaats",
-    "ceo:heeftGemeente",
     "ceo:heeftAdres",
     "ceo:heeftArchitect",
     "ceo:heeftFunctie",
@@ -29,9 +28,7 @@ FORBIDDEN_LANGUAGE_FILTERS = [
     "LANG(",
     "LANGMATCHES(",
     "langmatches(",
-    "@nl",
 ]
-
 
 def validate_sparql(query: str) -> tuple[list[str], list[str]]:
     errors: list[str] = []
@@ -66,10 +63,11 @@ def validate_sparql(query: str) -> tuple[list[str], list[str]]:
     if where_pos == -1:
         errors.append("WHERE ontbreekt.")
 
-    if from_pos == -1:
+    uses_named_graph = "GRAPH " in q_upper
+
+    if from_pos == -1 and not uses_named_graph:
         errors.append(
-            f"FROM ontbreekt. Gebruik: FROM <{DEFAULT_GRAPH}>"
-        )
+        f"FROM ontbreekt. Gebruik FROM <{DEFAULT_GRAPH}> of expliciete GRAPH-blokken.")
 
     if select_pos != -1 and from_pos != -1 and from_pos < select_pos:
         errors.append("FROM staat vóór SELECT. Gebruik: SELECT ... FROM ... WHERE ...")
