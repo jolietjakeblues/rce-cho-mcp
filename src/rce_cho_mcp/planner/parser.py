@@ -20,8 +20,8 @@ def parse_question(question: str) -> QueryPlan:
 
     match = re.search(r"\bin\s+([A-Za-zÀ-ÿ' -]+)\??$", question.strip())
     if match:
-    plaats = match.group(1).strip()
-    filters["gemeente"] = plaats
+        plaats = match.group(1).strip()
+        filters["gemeente"] = plaats
 
     return QueryPlan(
         intent=intent,
