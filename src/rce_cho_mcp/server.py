@@ -4,7 +4,13 @@ from mcp.server.fastmcp import FastMCP
 
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
-from rce_cho_mcp.ontology.registry import get_classes, get_properties, describe_class
+from rce_cho_mcp.ontology.registry import (
+    get_classes,
+    get_properties,
+    describe_class,
+    describe_property,
+    search_ontology,
+)
 
 mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
 
@@ -32,6 +38,16 @@ def ontology_summary() -> str:
 def ontology_describe_class(class_name: str) -> str:
     """Beschrijf een CEO-class op basis van de ingelezen ontologie."""
     return describe_class(class_name)
+
+@mcp.tool()
+def ontology_search(term: str) -> str:
+    """Zoek classes en properties in de CEO-ontologie."""
+    return search_ontology(term)
+
+@mcp.tool()
+def ontology_describe_property(property_name: str) -> str:
+    """Beschrijf een CEO-property op basis van de ingelezen ontologie."""
+    return describe_property(property_name)
 
 @mcp.tool()
 def query_sparql(sparql_query: str, max_rows: int = 100) -> str:

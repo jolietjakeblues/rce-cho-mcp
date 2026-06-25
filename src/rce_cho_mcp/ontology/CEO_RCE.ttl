@@ -1028,7 +1028,7 @@ ceo:heeftFunctieNaam
   dcterms:description "This property establishes the relationship between a function and its name."@en ;
 .
 ceo:heeftGebeurtenis
-  rdf:type owl:ObjectProperty ;
+  rdf:type owl:ObjectProperty ;em
   dcterms:created "2018-04-10"^^xsd:date ;
   dcterms:modified "2018-06-28"^^xsd:date ;
   rdfs:comment "De property heeftGebeurtenis legt de relatie tussen een cultuurhistorisch object en de gebeurtenis vast."@nl ;
