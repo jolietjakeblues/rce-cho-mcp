@@ -11,33 +11,12 @@ De server biedt capabilities voor:
 - CEO-ontologie
 - thesauri en SKOS-concepten
 - dataset-semantiek
+- named graph kennis
 - URI-resolutie
 - SPARQL-validatie
 - SPARQL-executie
 
 Een client, zoals Claude Desktop, ChatGPT, Gemini, Cursor, VS Code of een Python-script, bepaalt zelf hoe deze capabilities worden gecombineerd.
-
----
-
-## Architectuur
-
-```text
-                 LLM client
-                     │
-              MCP protocol
-                     │
-          rce-cho-mcp server
-                     │
- ┌──────────────┬─────┼──────────────┬──────────────┐
- │              │     │              │              │
-Ontology   Semantics Resolver    Validator      Execution
- │              │     │              │              │
- └──────────────┴─────┼──────────────┴──────────────┘
-                      │
-              RCE CHO SPARQL endpoint
-```
-
----
 
 ## Linked Data-model
 
@@ -73,8 +52,6 @@ Labels en namen zijn meestal presentatie.
 Concepten, types en relaties zijn selectiecriteria.
 ```
 
----
-
 ## Capabilitygroepen
 
 ### 1. Discovery
@@ -84,10 +61,9 @@ Helpt een client ontdekken wat beschikbaar is.
 Huidige tools:
 
 - `ping`
+- `graphs_list`
 - `ontology_statistics`
 - `ontology_search`
-
----
 
 ### 2. Ontology
 
@@ -104,8 +80,6 @@ Voorbeelden:
 - Welke classes bevatten het woord `Adres`?
 - Welke properties hebben `Gemeente` in hun label?
 
----
-
 ### 3. Dataset semantics
 
 Geeft interpretatieregels voor belangrijke RCE-datapatronen.
@@ -118,34 +92,78 @@ Huidige tools:
 - `semantics_list_topics`
 - `semantics_describe_topic`
 
-Voorbeelden van topics:
+Huidige topics:
 
 - `functions`
+- `legal_status`
+- `monument_aard`
 - `names`
-- `status`
-- `location`
+- `descriptions`
 
-Voorbeeld:
+Belangrijke patronen:
 
 ```text
-Vraag: Welke kerken staan in Roermond?
-
-Niet:
-objectnaam bevat "kerk"
-
-Wel:
-functieconcept rond "kerk"
+Functie:
+ceo:heeftOorspronkelijkeFunctie / ceo:heeftHuidigeFunctie
     ↓
-ceo:heeftFunctie
+ceo:heeftFunctieNaam
     ↓
-optioneel ceo:hoofdfunctie true
-    ↓
-objecten in gemeente Roermond
+skos:prefLabel
 ```
 
----
+```text
+Juridische status:
+ceo:heeftJuridischeStatus
+    ↓
+skos:prefLabel
+```
 
-### 4. Resolver
+```text
+Monumentaard:
+ceo:heeftMonumentAard
+    ↓
+skos:prefLabel
+```
+
+```text
+Naam:
+ceo:heeftNaam
+    ↓
+ceo:naam
+```
+
+```text
+Omschrijving:
+ceo:heeftOmschrijving
+    ↓
+ceo:omschrijving
+```
+
+Belangrijke regel:
+
+```text
+Gebruik ceo:registergegeven niet als juridische status.
+Juridische status loopt via ceo:heeftJuridischeStatus en skos:prefLabel.
+```
+
+### 4. Graphs
+
+Geeft kennis over named graphs in het CHO-KENNIS endpoint.
+
+Huidige tools:
+
+- `graphs_list`
+
+Deze capability helpt clients bepalen wanneer een `FROM` of `GRAPH` nuttig is en wanneer een cross-graph query nodig kan zijn.
+
+Belangrijke regel:
+
+```text
+Gebruik FROM of GRAPH alleen wanneer je zeker weet in welke named graph de relevante triples staan.
+Bij relaties over meerdere graphs kan een query zonder graphrestrictie correct zijn.
+```
+
+### 5. Resolver
 
 Lost labels op naar URI's zonder zelf domeinkeuzes te maken.
 
@@ -169,9 +187,7 @@ Ontwerpprincipe:
 
 De resolver kiest nooit zelf tussen meerdere resultaten.
 
----
-
-### 5. Validator
+### 6. Validator
 
 Controleert SPARQL-query's op bekende valkuilen.
 
@@ -182,14 +198,13 @@ Huidige tools:
 
 Voorbeelden van controles:
 
-- verboden prefixes
+- verdachte prefixes
 - onjuiste `SELECT/FROM/WHERE` volgorde
 - ontbreken van `DISTINCT`
-- gebruik van bekende foutieve properties
+- `COUNT` zonder alias
+- query zonder `FROM` of `GRAPH` als waarschuwing, niet als fout
 
----
-
-### 6. Execution
+### 7. Execution
 
 Voert SPARQL-query's uit op het RCE CHO endpoint.
 
@@ -208,8 +223,6 @@ SPARQL endpoint
     ↓
 JSON resultaat
 ```
-
----
 
 ## Belangrijk ontwerpprincipe
 
@@ -237,8 +250,6 @@ query
 
 Alleen wanneer de Linked Data onvoldoende informatie biedt, mag kennis in Python worden vastgelegd. Dit moet dan expliciet gedocumenteerd worden.
 
----
-
 ## Wat deze server niet doet
 
 Deze server is niet verantwoordelijk voor:
@@ -254,14 +265,11 @@ Deze server is niet verantwoordelijk voor:
 
 Dat is de verantwoordelijkheid van de client of van een aparte reference implementation.
 
----
-
 ## Toekomstige capabilities
 
 Mogelijke uitbreidingen:
 
 - `search_concepts`
-- `list_graphs`
 - `list_prefixes`
 - `structured_results`
 - `structured_ontology`
@@ -269,25 +277,6 @@ Mogelijke uitbreidingen:
 - `rest_api`
 
 Nieuwe capabilities worden alleen toegevoegd wanneer ze generiek bruikbaar zijn voor meerdere clients.
-
----
-
-## Voorbeelden van clients
-
-Deze architectuur maakt gebruik mogelijk vanuit onder andere:
-
-- Claude Desktop
-- ChatGPT
-- Gemini
-- LM Studio
-- VS Code
-- Cursor
-- Windsurf
-- Python
-- LangChain
-- LlamaIndex
-
----
 
 ## Samenvatting
 
@@ -299,6 +288,8 @@ De client combineert deze bouwstenen.
 ontology
     ↓
 semantics
+    ↓
+graphs
     ↓
 resolver
     ↓

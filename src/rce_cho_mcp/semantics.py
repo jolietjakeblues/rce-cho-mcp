@@ -1,99 +1,123 @@
 SEMANTIC_TOPICS = {
     "functions": {
-        "title": "Functions",
+        "title": "Functies",
         "description": (
-            "Use function relations and function concepts when a question is about "
-            "what an object is or was used for. Do not filter on object names."
+            "Gebruik functiepaden wanneer een vraag gaat over wat een monument is "
+            "of oorspronkelijk was. Filter niet op naam of omschrijving."
         ),
-        "properties": [
+        "patterns": [
             {
-                "property": "ceo:heeftFunctie",
-                "role": "Links an object or knowledge node to a function concept.",
+                "name": "Oorspronkelijke functie",
+                "path": [
+                    "ceo:heeftOorspronkelijkeFunctie",
+                    "ceo:heeftFunctieNaam",
+                    "skos:prefLabel",
+                ],
                 "guidance": (
-                    "Use this route for questions about churches, houses, mills, "
-                    "farms, schools and other object functions."
+                    "Gebruik dit pad vaak als eerste bij vragen als boerderijen, "
+                    "kerken, molens, scholen of fabrieken."
                 ),
             },
             {
-                "property": "ceo:hoofdfunctie",
-                "role": "Marks whether a function is the primary function.",
+                "name": "Huidige functie",
+                "path": [
+                    "ceo:heeftHuidigeFunctie",
+                    "ceo:heeftFunctieNaam",
+                    "skos:prefLabel",
+                ],
                 "guidance": (
-                    "When an object has multiple functions, prefer records where "
-                    "ceo:hoofdfunctie is true if the user asks for the main function."
+                    "Gebruik dit pad wanneer de vraag expliciet gaat over huidig "
+                    "gebruik of actuele functie."
+                ),
+            },
+        ],
+    },
+    "legal_status": {
+        "title": "Juridische status",
+        "description": (
+            "Gebruik juridische status om te bepalen of een object rijksmonument, "
+            "voorbeschermd of geen rijksmonument is."
+        ),
+        "patterns": [
+            {
+                "name": "Juridische status",
+                "path": [
+                    "ceo:heeftJuridischeStatus",
+                    "skos:prefLabel",
+                ],
+                "known_values": [
+                    "rijksmonument",
+                    "voorbeschermd",
+                    "geen rijksmonument",
+                ],
+                "guidance": (
+                    "Gebruik dit pad voor vragen over actieve rijksmonumenten of "
+                    "juridische status. Gebruik hiervoor niet ceo:registergegeven."
+                ),
+            },
+        ],
+    },
+    "monument_aard": {
+        "title": "Monumentaard",
+        "description": (
+            "Gebruik monumentaard om onderscheid te maken tussen archeologische "
+            "en gebouwde monumenten."
+        ),
+        "patterns": [
+            {
+                "name": "Monumentaard",
+                "path": [
+                    "ceo:heeftMonumentAard",
+                    "skos:prefLabel",
+                ],
+                "known_values": [
+                    "archeologisch",
+                    "onroerend gebouwd",
+                ],
+                "guidance": (
+                    "Gebruik dit pad bij vragen over gebouwde of archeologische "
+                    "rijksmonumenten."
                 ),
             },
         ],
     },
     "names": {
-        "title": "Names",
+        "title": "Namen",
         "description": (
-            "Names are useful for presentation, but usually not for selecting objects."
+            "Gebruik namen voor presentatie. Gebruik namen meestal niet als eerste "
+            "selectiecriterium."
         ),
-        "properties": [
+        "patterns": [
             {
-                "property": "ceo:heeftNaam",
-                "role": "Links an object to a name node.",
-                "guidance": "Use this to retrieve names, not as the first filter.",
-            },
-            {
-                "property": "ceo:naam",
-                "role": "Literal value of a name node.",
-                "guidance": "Use for display after selecting objects through type, function or location.",
-            },
-            {
-                "property": "ceo:huidigeNaam",
-                "role": "Marks whether a name is current.",
-                "guidance": "Prefer current names when multiple names exist.",
-            },
-            {
-                "property": "ceo:formeelStandpunt",
-                "role": "Marks whether a name reflects the formal RCE position.",
-                "guidance": "Prefer formal RCE names when available.",
-            },
-        ],
-    },
-    "status": {
-        "title": "Status",
-        "description": (
-            "Use status properties to distinguish active register objects from other records."
-        ),
-        "properties": [
-            {
-                "property": "ceo:heeftJuridischeStatus",
-                "role": "Links an object to its legal status concept.",
+                "name": "Naam",
+                "path": [
+                    "ceo:heeftNaam",
+                    "ceo:naam",
+                ],
                 "guidance": (
-                    "Use this when the user asks for active rijksmonumenten or formally "
-                    "protected objects."
+                    "Gebruik dit pad om een naam te tonen nadat objecten zijn "
+                    "geselecteerd via type, functie, locatie of status."
                 ),
             },
-            {
-                "property": "ceo:registergegeven",
-                "role": "Marks whether a statement is a register fact.",
-                "guidance": "Use when formal register information matters.",
-            },
         ],
     },
-    "location": {
-        "title": "Location",
+    "descriptions": {
+        "title": "Omschrijvingen",
         "description": (
-            "Location data can be spread across multiple nodes and graphs. "
-            "Use concept URIs for municipalities and provinces."
+            "Gebruik omschrijvingen om uit te leggen waarom of hoe een object "
+            "in het register beschreven staat."
         ),
-        "properties": [
+        "patterns": [
             {
-                "property": "ceo:heeftLocatieAanduiding",
-                "role": "Links an object to a location indication node.",
-                "guidance": "Inspect this route for addresses, places and administrative locations.",
-            },
-            {
-                "property": "ceo:heeftBasisregistratieRelatie",
-                "role": "Links location data to basic registration relations.",
-                "guidance": "Use this route when looking for municipality or BAG-related information.",
-            },
-            {
-                "property": "ceo:heeftGemeente",
-                "role": "Links a registration relation to a municipality concept.",
-                "guidance": "Resolve the municipality label first, then filter by the URI.",
+                "name": "Omschrijving",
+                "path": [
+                    "ceo:heeftOmschrijving",
+                    "ceo:omschrijving",
+                ],
+                "guidance": (
+                    "Gebruik dit pad voor beschrijvende tekst. Filter hier alleen "
+                    "op als er geen beter conceptueel pad bestaat."
+                ),
             },
         ],
     },
@@ -155,16 +179,17 @@ def format_topic(topic: str) -> str:
         "",
         data["description"],
         "",
-        "Belangrijke properties:",
+        "Patronen:",
     ]
 
-    for prop in data["properties"]:
-        lines.extend(
-            [
-                f"- {prop['property']}",
-                f"  Rol: {prop['role']}",
-                f"  Gebruik: {prop['guidance']}",
-            ]
-        )
+    for pattern in data["patterns"]:
+        lines.append(f"- {pattern['name']}")
+        lines.append(f"  Pad: {' -> '.join(pattern['path'])}")
+
+        if "known_values" in pattern:
+            values = ", ".join(pattern["known_values"])
+            lines.append(f"  Bekende waarden: {values}")
+
+        lines.append(f"  Gebruik: {pattern['guidance']}")
 
     return "\n".join(lines)
