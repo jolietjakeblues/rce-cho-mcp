@@ -12,6 +12,7 @@ from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.resolver import describe_resource, resolve_label
 from rce_cho_mcp.semantics import format_topic, format_topics
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
+from rce_cho_mcp.graphs import format_graphs
 from rce_cho_mcp.validator import format_validation_report, validate_sparql
 
 
@@ -23,6 +24,10 @@ def ping() -> str:
     """Test of de MCP-server bereikbaar is."""
     return "RCE CHO MCP werkt."
 
+@mcp.tool()
+def graphs_list() -> str:
+    """Toon bekende CHO named graphs."""
+    return format_graphs()
 
 @mcp.tool()
 def ontology_statistics() -> str:

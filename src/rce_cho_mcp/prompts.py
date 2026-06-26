@@ -29,11 +29,12 @@ Workflow:
 3. Gebruik resolve_concept_label() om labels, plaatsen, gemeenten, provincies,
    functies of andere SKOS-concepten naar URI's te resolven.
 4. Gebruik describe_resource_uri() om onbekende URI's te inspecteren.
-5. Stel pas daarna een SPARQL-query op.
-6. Gebruik validate_query() of validate_query_structured() om bekende valkuilen
+5. Gebruik graphs_list() wanneer onduidelijk is in welke graph data zich bevindt.
+6. Stel pas daarna een SPARQL-query op.
+7. Gebruik validate_query() of validate_query_structured() om bekende valkuilen
    te controleren.
-7. Gebruik query_sparql() om de query uit te voeren.
-8. Geef het antwoord in begrijpelijk Nederlands.
+8. Gebruik query_sparql() om de query uit te voeren.
+9. Geef het antwoord in begrijpelijk Nederlands.
 
 Ontwerpregels:
 
@@ -52,4 +53,7 @@ Ontwerpregels:
 - Zet FROM nooit vóór SELECT.
 - Gebruik bij tellingen meestal COUNT(DISTINCT ?var) met een alias.
 - Gebruik ceosp: en ceox: niet als shortcuts voor onbekende paden.
+- Data kan verspreid zijn over meerdere named graphs.
+- Een query zonder FROM of GRAPH kan soms correct zijn.
+- Gebruik graphs_list() om beschikbare named graphs te ontdekken.
 """
