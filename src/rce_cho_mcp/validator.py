@@ -6,23 +6,6 @@ FORBIDDEN_PREFIXES = [
     "ceox:",
 ]
 
-FORBIDDEN_CLASSES = [
-    "ceo:Rijksmonumenten",
-    "ceo:ArcheologischeComplexen",
-    "ceo:ArcheologischeTerreinen",
-    "ceo:Vondst",
-]
-
-FORBIDDEN_PROPERTIES = [
-    "ceosp:heeftProvincie",
-    "ceox:heeftProvincie",
-    "ceox:heeftAdresgegevens",
-    "ceo:heeftPlaats",
-    "ceo:heeftAdres",
-    "ceo:heeftArchitect",
-    "ceo:heeftFunctie",
-]
-
 FORBIDDEN_LANGUAGE_FILTERS = [
     "lang(",
     "LANG(",
@@ -32,7 +15,11 @@ FORBIDDEN_LANGUAGE_FILTERS = [
 
 
 def validate_sparql(query: str) -> dict:
-    """Validate a SPARQL query against known RCE CHO pitfalls."""
+    """Validate a SPARQL query against known RCE CHO pitfalls.
+
+    This validator does not validate domain classes or properties.
+    Use ontology tools for that.
+    """
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -41,19 +28,17 @@ def validate_sparql(query: str) -> dict:
 
     for prefix in FORBIDDEN_PREFIXES:
         if prefix in q:
-            errors.append(f"Verboden prefix gevonden: {prefix}")
-
-    for class_name in FORBIDDEN_CLASSES:
-        if class_name in q:
-            errors.append(f"Verboden classnaam gevonden: {class_name}")
-
-    for prop in FORBIDDEN_PROPERTIES:
-        if prop in q:
-            errors.append(f"Verboden property gevonden: {prop}")
+            warnings.append(
+                f"Verdachte prefix gevonden: {prefix}. "
+                "Controleer met ontology_search() of deze prefix echt bestaat."
+            )
 
     for term in FORBIDDEN_LANGUAGE_FILTERS:
         if term in q:
-            errors.append(f"Verboden taalfilter gevonden: {term}")
+            warnings.append(
+                f"Taalfilter gevonden: {term}. "
+                "Controleer of labels in deze data daadwerkelijk taalgetagd zijn."
+            )
 
     select_pos = q_upper.find("SELECT")
     from_pos = q_upper.find("FROM")
@@ -68,15 +53,15 @@ def validate_sparql(query: str) -> dict:
     uses_named_graph = "GRAPH " in q_upper
 
     if from_pos == -1 and not uses_named_graph:
-        errors.append(
-            f"FROM ontbreekt. Gebruik FROM <{DEFAULT_DATASET_GRAPH}> "
-            "of expliciete GRAPH-blokken."
+        warnings.append(
+            "Geen FROM of GRAPH gevonden. Dit kan bewust zijn bij queries "
+            "over meerdere named graphs. Controleer of dit gewenst is. "
+            f"Gebruik anders FROM <{DEFAULT_DATASET_GRAPH}> of expliciete GRAPH-blokken."
         )
 
     if select_pos != -1 and from_pos != -1 and from_pos < select_pos:
         errors.append(
-            "FROM staat vóór SELECT. Gebruik: "
-            "SELECT ... FROM ... WHERE ..."
+            "FROM staat vóór SELECT. Gebruik: SELECT ... FROM ... WHERE ..."
         )
 
     if select_pos != -1 and from_pos != -1 and where_pos != -1:
@@ -90,7 +75,8 @@ def validate_sparql(query: str) -> dict:
 
     if "FROM" in q_upper and expected_from not in q:
         warnings.append(
-            f"Controleer de graph. Verwacht meestal: {expected_from}"
+            f"Controleer de graph. Verwacht vaak: {expected_from}. "
+            "Bij cross-graph queries kan een andere aanpak nodig zijn."
         )
 
     if "SELECT COUNT(" in q_upper:
@@ -101,7 +87,7 @@ def validate_sparql(query: str) -> dict:
 
     if "COUNT(" in q_upper and "DISTINCT" not in q_upper:
         warnings.append(
-            "Gebruik COUNT(DISTINCT ?var) bij tellingen met joins."
+            "Gebruik meestal COUNT(DISTINCT ?var) bij tellingen met joins."
         )
 
     if (

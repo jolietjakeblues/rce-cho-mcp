@@ -10,6 +10,7 @@ from rce_cho_mcp.ontology.api import (
 )
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.resolver import describe_resource, resolve_label
+from rce_cho_mcp.semantics import format_topic, format_topics
 from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
 from rce_cho_mcp.validator import format_validation_report, validate_sparql
 
@@ -50,6 +51,18 @@ def ontology_describe_class(class_name: str) -> str:
 def ontology_describe_property(property_name: str) -> str:
     """Beschrijf een CEO-property op basis van de ingelezen ontologie."""
     return describe_property(property_name)
+
+
+@mcp.tool()
+def semantics_list_topics() -> str:
+    """Toon beschikbare dataset-semantiek onderwerpen."""
+    return format_topics()
+
+
+@mcp.tool()
+def semantics_describe_topic(topic: str) -> str:
+    """Geef interpretatieregels voor een dataset-semantiek onderwerp."""
+    return format_topic(topic)
 
 
 @mcp.tool()

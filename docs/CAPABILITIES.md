@@ -9,7 +9,8 @@ Het doel is een generieke open source MCP-server te bieden waarmee LLM-clients b
 De server biedt capabilities voor:
 
 - CEO-ontologie
-- OWMS en SKOS-concepten
+- thesauri en SKOS-concepten
+- dataset-semantiek
 - URI-resolutie
 - SPARQL-validatie
 - SPARQL-executie
@@ -27,13 +28,49 @@ Een client, zoals Claude Desktop, ChatGPT, Gemini, Cursor, VS Code of een Python
                      │
           rce-cho-mcp server
                      │
-     ┌───────────────┼────────────────┐
-     │               │                │
- Ontology         Resolver        Query tools
-     │               │                │
-     └───────────────┼────────────────┘
-                     │
+ ┌──────────────┬─────┼──────────────┬──────────────┐
+ │              │     │              │              │
+Ontology   Semantics Resolver    Validator      Execution
+ │              │     │              │              │
+ └──────────────┴─────┼──────────────┴──────────────┘
+                      │
               RCE CHO SPARQL endpoint
+```
+
+---
+
+## Linked Data-model
+
+De server gaat uit van het Linked Data-model van de RCE-data.
+
+Belangrijke uitgangspunten:
+
+- objecten staan in datasetgraphs
+- betekenissen staan vaak in thesauri
+- labels staan meestal op SKOS-concepten, niet op erfgoedobjecten zelf
+- menselijke woorden moeten eerst naar concept-URI's worden vertaald
+- concept-URI's worden daarna gebruikt in SPARQL-query's
+- relevante triples kunnen verspreid zijn over meerdere named graphs
+
+Voorbeeld:
+
+```text
+menselijke term
+    ↓
+SKOS prefLabel / altLabel
+    ↓
+concept URI
+    ↓
+SPARQL filter
+    ↓
+erfgoedobjecten
+```
+
+Belangrijke ontwerpregel:
+
+```text
+Labels en namen zijn meestal presentatie.
+Concepten, types en relaties zijn selectiecriteria.
 ```
 
 ---
@@ -69,7 +106,46 @@ Voorbeelden:
 
 ---
 
-### 3. Resolver
+### 3. Dataset semantics
+
+Geeft interpretatieregels voor belangrijke RCE-datapatronen.
+
+Ontology zegt wat er bestaat.  
+Dataset semantics zegt wat belangrijk is bij interpretatie.
+
+Huidige tools:
+
+- `semantics_list_topics`
+- `semantics_describe_topic`
+
+Voorbeelden van topics:
+
+- `functions`
+- `names`
+- `status`
+- `location`
+
+Voorbeeld:
+
+```text
+Vraag: Welke kerken staan in Roermond?
+
+Niet:
+objectnaam bevat "kerk"
+
+Wel:
+functieconcept rond "kerk"
+    ↓
+ceo:heeftFunctie
+    ↓
+optioneel ceo:hoofdfunctie true
+    ↓
+objecten in gemeente Roermond
+```
+
+---
+
+### 4. Resolver
 
 Lost labels op naar URI's zonder zelf domeinkeuzes te maken.
 
@@ -95,7 +171,7 @@ De resolver kiest nooit zelf tussen meerdere resultaten.
 
 ---
 
-### 4. Validator
+### 5. Validator
 
 Controleert SPARQL-query's op bekende valkuilen.
 
@@ -113,7 +189,7 @@ Voorbeelden van controles:
 
 ---
 
-### 5. Execution
+### 6. Execution
 
 Voert SPARQL-query's uit op het RCE CHO endpoint.
 
@@ -159,7 +235,7 @@ Python dictionary
 query
 ```
 
-Alleen wanneer de Linked Data onvoldoende informatie biedt, mag kennis in Python worden vastgelegd.
+Alleen wanneer de Linked Data onvoldoende informatie biedt, mag kennis in Python worden vastgelegd. Dit moet dan expliciet gedocumenteerd worden.
 
 ---
 
@@ -184,6 +260,7 @@ Dat is de verantwoordelijkheid van de client of van een aparte reference impleme
 
 Mogelijke uitbreidingen:
 
+- `search_concepts`
 - `list_graphs`
 - `list_prefixes`
 - `structured_results`
@@ -220,6 +297,8 @@ De client combineert deze bouwstenen.
 
 ```text
 ontology
+    ↓
+semantics
     ↓
 resolver
     ↓
