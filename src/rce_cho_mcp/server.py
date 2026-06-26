@@ -1,16 +1,18 @@
 import urllib.error
 
 from mcp.server.fastmcp import FastMCP
-from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
-from rce_cho_mcp.validator import format_validation_report
-from rce_cho_mcp.resolver import describe_resource, resolve_label
-from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
+
 from rce_cho_mcp.ontology.api import (
     describe_class,
     describe_property,
     search_ontology,
     statistics,
 )
+from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
+from rce_cho_mcp.resolver import describe_resource, resolve_label
+from rce_cho_mcp.sparql import SPARQL_ENDPOINT, execute_sparql, format_results
+from rce_cho_mcp.validator import format_validation_report, validate_sparql
+
 
 mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
 
@@ -54,8 +56,8 @@ def ontology_describe_property(property_name: str) -> str:
 def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl") -> str:
     """Resolveer een SKOS prefLabel naar concept-URI's in een named graph.
 
-    Geeft alle matches terug (URI + rdf:type). De client kiest welke
-    relevant is — de resolver kiest niet zelf.
+    Geeft alle matches terug met URI en rdf:type. De client kiest welke
+    relevant is. De resolver kiest niet zelf.
     """
     matches = resolve_label(label, graph_name=graph_name, lang=lang)
 
@@ -63,6 +65,7 @@ def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl"
         return f"Geen concept gevonden voor label '{label}' in graph:{graph_name}."
 
     lines = [f"{len(matches)} match(es) gevonden voor '{label}' in graph:{graph_name}:"]
+
     for match in matches:
         types = ", ".join(match["types"]) if match["types"] else "onbekend"
         lines.append(f"- {match['uri']} (type: {types})")
@@ -91,17 +94,25 @@ def validate_query(sparql_query: str) -> str:
 
 
 @mcp.tool()
+def validate_query_structured(sparql_query: str) -> dict:
+    """Valideer een SPARQL-query en geef errors/warnings gestructureerd terug."""
+    return validate_sparql(sparql_query)
+
+
+@mcp.tool()
 def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
     """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint."""
     try:
         data = execute_sparql(sparql_query)
         return format_results(data, max_rows=max_rows)
+
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         return (
             f"HTTP fout {e.code} van endpoint {SPARQL_ENDPOINT}: {e.reason}\n\n"
             f"Endpoint antwoord:\n{body[:1000]}"
         )
+
     except Exception as e:
         return f"Onverwachte fout: {type(e).__name__}: {e}"
 

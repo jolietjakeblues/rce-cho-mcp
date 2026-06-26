@@ -6,6 +6,7 @@ from rce_cho_mcp.ontology.registry import (
     search_ontology,
 )
 
+
 __all__ = [
     "describe_class",
     "describe_property",
@@ -17,6 +18,7 @@ __all__ = [
     "statistics",
 ]
 
+
 def statistics() -> dict[str, int]:
     """Return basic ontology statistics."""
     return {
@@ -24,11 +26,12 @@ def statistics() -> dict[str, int]:
         "properties": len(get_properties()),
     }
 
+
 def list_classes() -> list[str]:
     """Return all ontology class names."""
     return sorted(get_classes().keys())
 
+
 def list_properties() -> list[str]:
     """Return all ontology property names."""
     return sorted(get_properties().keys())
-

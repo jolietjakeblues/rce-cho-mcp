@@ -19,3 +19,5 @@ rce-cho-mcp = "rce_cho_mcp.server:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+keywords = ["mcp", "linked-data", "sparql", "rce", "cultural-heritage"]

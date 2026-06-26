@@ -1,4 +1,4 @@
-from rce_cho_mcp.config import DEFAULT_GRAPH
+from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH
 
 
 FORBIDDEN_PREFIXES = [
@@ -30,7 +30,9 @@ FORBIDDEN_LANGUAGE_FILTERS = [
     "langmatches(",
 ]
 
-def validate_sparql(query: str) -> tuple[list[str], list[str]]:
+
+def validate_sparql(query: str) -> dict:
+    """Validate a SPARQL query against known RCE CHO pitfalls."""
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -67,50 +69,75 @@ def validate_sparql(query: str) -> tuple[list[str], list[str]]:
 
     if from_pos == -1 and not uses_named_graph:
         errors.append(
-        f"FROM ontbreekt. Gebruik FROM <{DEFAULT_GRAPH}> of expliciete GRAPH-blokken.")
+            f"FROM ontbreekt. Gebruik FROM <{DEFAULT_DATASET_GRAPH}> "
+            "of expliciete GRAPH-blokken."
+        )
 
     if select_pos != -1 and from_pos != -1 and from_pos < select_pos:
-        errors.append("FROM staat vóór SELECT. Gebruik: SELECT ... FROM ... WHERE ...")
+        errors.append(
+            "FROM staat vóór SELECT. Gebruik: "
+            "SELECT ... FROM ... WHERE ..."
+        )
 
     if select_pos != -1 and from_pos != -1 and where_pos != -1:
         if not (select_pos < from_pos < where_pos):
-            errors.append("Onjuiste SPARQL-volgorde. Gebruik: SELECT ... FROM ... WHERE ...")
+            errors.append(
+                "Onjuiste SPARQL-volgorde. Gebruik: "
+                "SELECT ... FROM ... WHERE ..."
+            )
 
-    expected_from = f"FROM <{DEFAULT_GRAPH}>"
+    expected_from = f"FROM <{DEFAULT_DATASET_GRAPH}>"
+
     if "FROM" in q_upper and expected_from not in q:
-        warnings.append(f"Controleer de graph. Verwacht: {expected_from}")
+        warnings.append(
+            f"Controleer de graph. Verwacht meestal: {expected_from}"
+        )
 
     if "SELECT COUNT(" in q_upper:
         errors.append(
-            "Gebruik een alias bij COUNT: SELECT (COUNT(DISTINCT ?rm) AS ?aantal)"
+            "Gebruik een alias bij COUNT: "
+            "SELECT (COUNT(DISTINCT ?rm) AS ?aantal)"
         )
 
     if "COUNT(" in q_upper and "DISTINCT" not in q_upper:
-        warnings.append("Gebruik COUNT(DISTINCT ?var) bij tellingen met joins.")
+        warnings.append(
+            "Gebruik COUNT(DISTINCT ?var) bij tellingen met joins."
+        )
 
-    if "SELECT " in q_upper and "DISTINCT" not in q_upper and "COUNT(" not in q_upper:
-        warnings.append("Overweeg SELECT DISTINCT bij lijstqueries met joins.")
+    if (
+        "SELECT " in q_upper
+        and "DISTINCT" not in q_upper
+        and "COUNT(" not in q_upper
+    ):
+        warnings.append(
+            "Overweeg SELECT DISTINCT bij lijstqueries met joins."
+        )
 
-    return errors, warnings
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings,
+    }
 
 
 def format_validation_report(query: str) -> str:
-    errors, warnings = validate_sparql(query)
+    """Return a human-readable validation report."""
+    result = validate_sparql(query)
 
-    if not errors and not warnings:
-        return "✅ Geen bekende fouten gevonden. Query ziet er geldig uit."
+    if result["valid"] and not result["warnings"]:
+        return "OK: geen bekende fouten gevonden."
 
     lines = ["Validatierapport:"]
 
-    for error in errors:
-        lines.append(f"❌ {error}")
+    for error in result["errors"]:
+        lines.append(f"ERROR: {error}")
 
-    for warning in warnings:
-        lines.append(f"⚠️ {warning}")
+    for warning in result["warnings"]:
+        lines.append(f"WARNING: {warning}")
 
     return "\n".join(lines)
 
 
 def has_blocking_errors(query: str) -> bool:
-    errors, _warnings = validate_sparql(query)
-    return len(errors) > 0
+    result = validate_sparql(query)
+    return not result["valid"]

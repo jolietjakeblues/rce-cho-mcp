@@ -1,174 +1,161 @@
-Ja. Dit is precies het goede moment om te stoppen met coderen en de architectuur vast te leggen.
-
-Sterker nog: dit document gaat waarschijnlijk belangrijker worden dan een groot deel van de Python-code.
-
-Ik zou **niet** beginnen met tools opsommen, maar met de visie.
-
-Mijn voorstel:
-
-```text
-docs/
-    CAPABILITIES.md
-```
-
-Inhoud:
-
----
-
 # RCE CHO MCP Capabilities
 
 ## Doel
 
-Het doel van rce-cho-mcp is niet om Nederlandse vragen te beantwoorden.
+Het doel van `rce-cho-mcp` is niet om Nederlandse vragen zelf te beantwoorden.
 
-Het doel is een generieke open source MCP-server te bieden waarmee LLM's betrouwbaar de RCE Linked Data kunnen raadplegen.
+Het doel is een generieke open source MCP-server te bieden waarmee LLM-clients betrouwbaar de RCE Linked Data kunnen raadplegen.
 
-De server bevat domeinkennis over:
+De server biedt capabilities voor:
 
-* de CEO-ontologie
-* OWMS
-* SKOS-concepten
-* SPARQL-validatie
-* query-executie
+- CEO-ontologie
+- OWMS en SKOS-concepten
+- URI-resolutie
+- SPARQL-validatie
+- SPARQL-executie
 
-Een client (Claude, ChatGPT, Gemini, Cursor, VS Code, Python, REST API) bepaalt zelf hoe deze capabilities worden gecombineerd.
+Een client, zoals Claude Desktop, ChatGPT, Gemini, Cursor, VS Code of een Python-script, bepaalt zelf hoe deze capabilities worden gecombineerd.
 
 ---
 
-# Architectuur
+## Architectuur
 
 ```text
-                 LLM
-                  │
-          MCP protocol
-                  │
-        rce-cho-mcp server
-                  │
-     ┌────────────┼─────────────┐
-     │            │             │
- Ontology     Resolver      Query Engine
-     │            │             │
-     └────────────┼─────────────┘
-                  │
-            SPARQL endpoint
+                 LLM client
+                     │
+              MCP protocol
+                     │
+          rce-cho-mcp server
+                     │
+     ┌───────────────┼────────────────┐
+     │               │                │
+ Ontology         Resolver        Query tools
+     │               │                │
+     └───────────────┼────────────────┘
+                     │
+              RCE CHO SPARQL endpoint
 ```
 
 ---
 
-# Capabilitygroepen
+## Capabilitygroepen
 
-## 1. Ontology
-
-Geeft kennis over het datamodel.
-
-Mogelijke tools
-
-* get_ontology_context()
-* search_classes()
-* describe_class()
-* search_properties()
-* describe_property()
-
----
-
-## 2. Resolver
-
-Lost labels op naar URI's.
-
-Voorbeelden
-
-```
-Zeist
-↓
-OWMS URI
-```
-
-```
-kerk
-↓
-SKOS concept
-```
-
-```
-Rijksmuseum
-↓
-CHO URI
-```
-
-Mogelijke tools
-
-* resolve_label()
-* resolve_uri()
-* search_concepts()
-
----
-
-## 3. Query Builder
-
-Helpt bij het maken van correcte SPARQL.
-
-Mogelijke tools
-
-* build_query()
-* explain_query()
-
----
-
-## 4. Validator
-
-Controleert queries.
-
-Mogelijke tools
-
-* validate_query()
-
----
-
-## 5. Execution
-
-Voert queries uit.
-
-Mogelijke tools
-
-* execute_query()
-* describe_resource()
-
----
-
-## 6. Discovery
+### 1. Discovery
 
 Helpt een client ontdekken wat beschikbaar is.
 
-Mogelijke tools
+Huidige tools:
 
-* list_graphs()
-* list_datasets()
-* examples()
-* benchmark()
+- `ping`
+- `ontology_statistics`
+- `ontology_search`
 
 ---
 
-# Belangrijk ontwerpprincipe
+### 2. Ontology
+
+Geeft kennis over het datamodel.
+
+Huidige tools:
+
+- `ontology_describe_class`
+- `ontology_describe_property`
+
+Voorbeelden:
+
+- Welke properties horen bij `Rijksmonument`?
+- Welke classes bevatten het woord `Adres`?
+- Welke properties hebben `Gemeente` in hun label?
+
+---
+
+### 3. Resolver
+
+Lost labels op naar URI's zonder zelf domeinkeuzes te maken.
+
+Huidige tools:
+
+- `resolve_concept_label`
+- `describe_resource_uri`
+
+Voorbeeld:
+
+```text
+Utrecht
+↓
+http://standaarden.overheid.nl/owms/terms/Utrecht_(gemeente)
+http://standaarden.overheid.nl/owms/terms/Utrecht_(provincie)
+↓
+client kiest welke URI relevant is
+```
+
+Ontwerpprincipe:
+
+De resolver kiest nooit zelf tussen meerdere resultaten.
+
+---
+
+### 4. Validator
+
+Controleert SPARQL-query's op bekende valkuilen.
+
+Huidige tools:
+
+- `validate_query`
+- `validate_query_structured`
+
+Voorbeelden van controles:
+
+- verboden prefixes
+- onjuiste `SELECT/FROM/WHERE` volgorde
+- ontbreken van `DISTINCT`
+- gebruik van bekende foutieve properties
+
+---
+
+### 5. Execution
+
+Voert SPARQL-query's uit op het RCE CHO endpoint.
+
+Huidige tools:
+
+- `query_sparql`
+
+Voorbeeld:
+
+```text
+SPARQL query
+    ↓
+query_sparql()
+    ↓
+SPARQL endpoint
+    ↓
+JSON resultaat
+```
+
+---
+
+## Belangrijk ontwerpprincipe
 
 De MCP-server bevat zo min mogelijk hardgecodeerde kennis.
 
 Voorkeur:
 
-```
+```text
 Linked Data
-      ↓
+    ↓
 resolver
-      ↓
+    ↓
 URI
-      ↓
+    ↓
 query
 ```
 
 Niet:
 
-```
+```text
 Python dictionary
-      ↓
+    ↓
 query
 ```
 
@@ -176,33 +163,79 @@ Alleen wanneer de Linked Data onvoldoende informatie biedt, mag kennis in Python
 
 ---
 
-# Niet de verantwoordelijkheid van deze server
+## Wat deze server niet doet
 
 Deze server is niet verantwoordelijk voor:
 
-* natuurlijke taal begrijpen
-* conversaties voeren
-* redeneerstrategieën
-* UI
-* rapportages
+- natuurlijke taal begrijpen
+- conversaties voeren
+- redeneerstrategieën kiezen
+- UI maken
+- kaarten maken
+- rapportages maken
+- vaste use-cases hardcoderen
+- queryplanning
 
-Dat is de taak van de client.
+Dat is de verantwoordelijkheid van de client of van een aparte reference implementation.
+
+---
+
+## Toekomstige capabilities
+
+Mogelijke uitbreidingen:
+
+- `list_graphs`
+- `list_prefixes`
+- `structured_results`
+- `structured_ontology`
+- `python_sdk`
+- `rest_api`
+
+Nieuwe capabilities worden alleen toegevoegd wanneer ze generiek bruikbaar zijn voor meerdere clients.
 
 ---
 
-## Toekomst
+## Voorbeelden van clients
 
-Deze architectuur maakt clients mogelijk zoals:
+Deze architectuur maakt gebruik mogelijk vanuit onder andere:
 
-* Claude Desktop
-* ChatGPT
-* Gemini
-* VS Code
-* Cursor
-* Windsurf
-* Python SDK
-* REST API
-* LangChain
-* LlamaIndex
+- Claude Desktop
+- ChatGPT
+- Gemini
+- LM Studio
+- VS Code
+- Cursor
+- Windsurf
+- Python
+- LangChain
+- LlamaIndex
 
 ---
+
+## Samenvatting
+
+De MCP levert bouwstenen.
+
+De client combineert deze bouwstenen.
+
+```text
+ontology
+    ↓
+resolver
+    ↓
+validator
+    ↓
+execution
+```
+
+Niet:
+
+```text
+natuurlijke taal
+    ↓
+magische query builder
+    ↓
+antwoord
+```
+
+Dat onderscheid is het belangrijkste ontwerpprincipe van het project.

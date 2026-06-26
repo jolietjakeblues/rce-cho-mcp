@@ -1,19 +1,16 @@
 import json
 import urllib.parse
 import urllib.request
+
 from rce_cho_mcp.config import SPARQL_ENDPOINT, USER_AGENT
 
 
-# SPARQL_ENDPOINT = os.getenv(
-#    "SPARQL_ENDPOINT",
-#    "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql",
-#)
-
 def execute_sparql(query: str, timeout: int = 30) -> dict:
+    """Execute a SPARQL query and return the JSON response."""
     params = urllib.parse.urlencode({"query": query})
     url = f"{SPARQL_ENDPOINT}?{params}"
 
-    req = urllib.request.Request(
+    request = urllib.request.Request(
         url,
         headers={
             "Accept": "application/sparql-results+json",
@@ -21,12 +18,13 @@ def execute_sparql(query: str, timeout: int = 30) -> dict:
         },
     )
 
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        raw = resp.read().decode("utf-8")
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        raw = response.read().decode("utf-8")
         return json.loads(raw)
 
 
 def format_results(data: dict, max_rows: int = 100) -> str:
+    """Format SPARQL JSON results as readable text."""
     if "boolean" in data:
         return f"Resultaat: {data['boolean']}"
 
@@ -45,9 +43,10 @@ def format_results(data: dict, max_rows: int = 100) -> str:
 
     for row in rows:
         values = []
-        for var in variables:
-            cell = row.get(var, {})
-            values.append(cell.get("value", "—"))
+        for variable in variables:
+            cell = row.get(variable, {})
+            values.append(cell.get("value", "-"))
+
         lines.append(" | ".join(values))
 
     return "\n".join(lines)

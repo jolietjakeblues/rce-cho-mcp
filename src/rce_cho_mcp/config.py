@@ -5,7 +5,7 @@ SPARQL_ENDPOINT = os.getenv(
     "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql",
 )
 
-DEFAULT_GRAPH = os.getenv(
+DEFAULT_DATASET_GRAPH = os.getenv(
     "RCE_CHO_GRAPH",
     "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
 )

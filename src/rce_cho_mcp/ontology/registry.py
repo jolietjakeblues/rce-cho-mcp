@@ -5,8 +5,10 @@ from rce_cho_mcp.ontology.loader import load_ontology
 
 def _local_name(uri: URIRef) -> str:
     text = str(uri)
+
     if "#" in text:
         return text.rsplit("#", 1)[1]
+
     return text.rstrip("/").rsplit("/", 1)[-1]
 
 
@@ -42,15 +44,21 @@ def get_properties() -> dict[str, str]:
 
 def get_label(uri: str) -> str | None:
     graph = load_ontology()
+
     for label in graph.objects(URIRef(uri), RDFS.label):
         return str(label)
+
     return None
+
 
 def get_comment(uri: str) -> str | None:
     graph = load_ontology()
+
     for comment in graph.objects(URIRef(uri), RDFS.comment):
         return str(comment)
+
     return None
+
 
 def get_properties_for_class(class_name: str) -> dict[str, str]:
     classes = get_classes()
@@ -68,12 +76,13 @@ def get_properties_for_class(class_name: str) -> dict[str, str]:
 
     return dict(sorted(properties.items()))
 
+
 def describe_class(class_name: str) -> str:
     classes = get_classes()
 
     if class_name not in classes:
-        available = ", ".join(classes.keys())
-        return f"Onbekende class: {class_name}\n\nBeschikbare classes:\n{available}"
+        available = ", ".join(list(classes.keys())[:50])
+        return f"Onbekende class: {class_name}\n\nEerste beschikbare classes:\n{available}"
 
     uri = classes[class_name]
     label = get_label(uri) or class_name
@@ -94,6 +103,7 @@ def describe_class(class_name: str) -> str:
 
     return "\n".join(lines)
 
+
 def search_ontology(term: str) -> str:
     term_lower = term.lower().strip()
 
@@ -101,14 +111,16 @@ def search_ontology(term: str) -> str:
     properties = get_properties()
 
     class_matches = [
-        name for name in classes
+        name
+        for name in classes
         if term_lower in name.lower()
         or term_lower in (get_label(classes[name]) or "").lower()
         or term_lower in (get_comment(classes[name]) or "").lower()
     ]
 
     property_matches = [
-        name for name in properties
+        name
+        for name in properties
         if term_lower in name.lower()
         or term_lower in (get_label(properties[name]) or "").lower()
         or term_lower in (get_comment(properties[name]) or "").lower()
@@ -127,6 +139,8 @@ def search_ontology(term: str) -> str:
     lines.extend(f"- {name}: {properties[name]}" for name in property_matches[:20])
 
     return "\n".join(lines)
+
+
 def get_domain(uri: str) -> list[str]:
     graph = load_ontology()
     return [str(value) for value in graph.objects(URIRef(uri), RDFS.domain)]
