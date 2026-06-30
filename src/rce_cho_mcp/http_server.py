@@ -1,5 +1,7 @@
 import os
 
+from mcp.server.transport_security import TransportSecuritySettings
+
 from rce_cho_mcp.server import mcp
 
 
@@ -12,6 +14,9 @@ def main() -> None:
     mcp.settings.port = port
     mcp.settings.stateless_http = True
     mcp.settings.json_response = True
+    mcp.settings.transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=False
+    )
 
     mcp.run(transport="streamable-http")
 
