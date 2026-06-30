@@ -125,6 +125,10 @@ Relevant triples may be spread across multiple named graphs.
 ### Execution
 
 * `query_sparql`
+* `query_sparql_json`
+
+`query_sparql` returns readable text for humans.  
+`query_sparql_json` returns raw SPARQL JSON for agents, tables, benchmarks and follow-up processing.
 
 ## Why dataset semantics?
 
