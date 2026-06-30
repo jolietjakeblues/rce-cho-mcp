@@ -39,7 +39,6 @@ def ontology_statistics() -> str:
         f"Properties: {stats['properties']}"
     )
 
-
 @mcp.tool()
 def ontology_search(term: str) -> str:
     """Zoek classes en properties in de CEO-ontologie."""
@@ -51,24 +50,20 @@ def ontology_describe_class(class_name: str) -> str:
     """Beschrijf een CEO-class op basis van de ingelezen ontologie."""
     return describe_class(class_name)
 
-
 @mcp.tool()
 def ontology_describe_property(property_name: str) -> str:
     """Beschrijf een CEO-property op basis van de ingelezen ontologie."""
     return describe_property(property_name)
-
 
 @mcp.tool()
 def semantics_list_topics() -> str:
     """Toon beschikbare dataset-semantiek onderwerpen."""
     return format_topics()
 
-
 @mcp.tool()
 def semantics_describe_topic(topic: str) -> str:
     """Geef interpretatieregels voor een dataset-semantiek onderwerp."""
     return format_topic(topic)
-
 
 @mcp.tool()
 def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl") -> str:
@@ -90,7 +85,6 @@ def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl"
 
     return "\n".join(lines)
 
-
 @mcp.tool()
 def describe_resource_uri(uri: str) -> str:
     """Beschrijf een resource: alle predicaten en waarden van een URI in de RCE-graph."""
@@ -104,18 +98,15 @@ def describe_resource_uri(uri: str) -> str:
 
     return "\n".join(lines)
 
-
 @mcp.tool()
 def validate_query(sparql_query: str) -> str:
     """Valideer een SPARQL-query zonder deze uit te voeren."""
     return format_validation_report(sparql_query)
 
-
 @mcp.tool()
 def validate_query_structured(sparql_query: str) -> dict:
     """Valideer een SPARQL-query en geef errors/warnings gestructureerd terug."""
     return validate_sparql(sparql_query)
-
 
 @mcp.tool()
 def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
@@ -134,10 +125,31 @@ def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
     except Exception as e:
         return f"Onverwachte fout: {type(e).__name__}: {e}"
 
+@mcp.tool()
+def query_sparql_json(sparql_query: str) -> dict:
+    """Voer een SPARQL SELECT of ASK query uit en geef het ruwe JSON-resultaat terug."""
+    try:
+        return execute_sparql(sparql_query)
+
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        return {
+            "error": "http_error",
+            "status": e.code,
+            "reason": e.reason,
+            "endpoint": SPARQL_ENDPOINT,
+            "body": body[:1000],
+        }
+
+    except Exception as e:
+        return {
+            "error": "unexpected_error",
+            "type": type(e).__name__,
+            "message": str(e),
+        }
 
 def main() -> None:
     mcp.run()
-
 
 if __name__ == "__main__":
     main()
