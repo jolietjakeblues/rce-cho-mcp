@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: rce-cho-mcp
+    runtime: python
+
+    buildCommand: pip install -e .
+
+    startCommand: python -m rce_cho_mcp.http_server
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.0
+
+      - key: SPARQL_ENDPOINT
+        value: https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql
+
+      - key: RCE_CHO_GRAPH
+        value: https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce
