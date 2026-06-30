@@ -12,7 +12,7 @@ def main() -> None:
     The regular server.py entrypoint remains the local stdio server.
     """
     host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
+    port = int(os.environ["PORT"])
 
     mcp.settings.host = host
     mcp.settings.port = port
