@@ -4,13 +4,7 @@ from rce_cho_mcp.server import mcp
 
 
 def main() -> None:
-    """Run the RCE CHO MCP server over Streamable HTTP.
-
-    This entrypoint is intended for remote deployment, for example on Render,
-    Fly.io, Railway or a VPS.
-
-    The regular server.py entrypoint remains the local stdio server.
-    """
+    """Run the RCE CHO MCP server over Streamable HTTP."""
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.environ["PORT"])
 
@@ -18,6 +12,7 @@ def main() -> None:
     mcp.settings.port = port
     mcp.settings.stateless_http = True
     mcp.settings.json_response = True
+    mcp.settings.allowed_hosts = ["*"]
 
     mcp.run(transport="streamable-http")
 
