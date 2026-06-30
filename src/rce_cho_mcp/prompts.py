@@ -27,17 +27,20 @@ Workflow:
    en ontology_describe_property() om relevante classes en properties te vinden.
 2. Gebruik semantics_list_topics() en semantics_describe_topic() bij vragen over
    functie, juridische status, monumentaard, naam of omschrijving.
-3. Gebruik resolve_concept_label() om labels, plaatsen, gemeenten, provincies,
-   functies of andere SKOS-concepten naar URI's te resolven.
-4. Gebruik graphs_list() wanneer onduidelijk is in welke graph data zich bevindt.
-5. Gebruik describe_resource_uri() om onbekende URI's te inspecteren.
-6. Stel pas daarna een SPARQL-query op.
-7. Gebruik validate_query() of validate_query_structured() om bekende valkuilen
+3. Voor woorden als begraafplaats, kerkhof, kerk, boerderij, molen, school:
+   behandel dit als functievraag en gebruik semantics_describe_topic("functions").
+   Gebruik hiervoor niet ontology_search() en niet resolve_concept_label(..., graph_name="owms").
+4. Gebruik resolve_concept_label() alleen voor labels die als SKOS-concept in een bekende named graph gezocht moeten worden.
+   Gebruik graph_name="owms" alleen voor gemeenten en provincies.
+5. Gebruik graphs_list() wanneer onduidelijk is in welke graph data zich bevindt.
+6. Gebruik describe_resource_uri() om onbekende URI's te inspecteren.
+7. Stel pas daarna een SPARQL-query op.
+8. Gebruik validate_query() of validate_query_structured() om bekende valkuilen
    te controleren.
-8. Gebruik resolve_concept_label(graph_name="owms") alleen voor gemeenten, provincies en overheidstermen.
-9. Gebruik voor functies, juridische status en monumentaard de dataset-semantiek en query op skos:prefLabel via het juiste CEO-pad.
-10. Gebruik query_sparql() om de query uit te voeren.
-11. Geef het antwoord in begrijpelijk Nederlands.
+9. Gebruik resolve_concept_label(graph_name="owms") alleen voor gemeenten, provincies en overheidstermen.
+10. Gebruik voor functies, juridische status en monumentaard de dataset-semantiek en query op skos:prefLabel via het juiste CEO-pad.
+11. Gebruik query_sparql() om de query uit te voeren.
+12. Geef het antwoord in begrijpelijk Nederlands.
 
 Belangrijke RCE-patronen:
 
