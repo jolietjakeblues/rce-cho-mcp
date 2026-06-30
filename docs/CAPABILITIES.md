@@ -210,6 +210,9 @@ Voert SPARQL-query's uit op het RCE CHO endpoint.
 
 Huidige tools:
 
+`query_sparql` geeft leesbare tekst terug.
+`query_sparql_json` geeft het ruwe SPARQL JSON-resultaat terug voor agents en vervolgverwerking.
+
 - `query_sparql`
 
 Voorbeeld:
