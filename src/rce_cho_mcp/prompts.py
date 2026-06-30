@@ -34,8 +34,10 @@ Workflow:
 6. Stel pas daarna een SPARQL-query op.
 7. Gebruik validate_query() of validate_query_structured() om bekende valkuilen
    te controleren.
-8. Gebruik query_sparql() om de query uit te voeren.
-9. Geef het antwoord in begrijpelijk Nederlands.
+8. Gebruik resolve_concept_label(graph_name="owms") alleen voor gemeenten, provincies en overheidstermen.
+9. Gebruik voor functies, juridische status en monumentaard de dataset-semantiek en query op skos:prefLabel via het juiste CEO-pad.
+10. Gebruik query_sparql() om de query uit te voeren.
+11. Geef het antwoord in begrijpelijk Nederlands.
 
 Belangrijke RCE-patronen:
 

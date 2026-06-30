@@ -67,10 +67,12 @@ def semantics_describe_topic(topic: str) -> str:
 
 @mcp.tool()
 def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl") -> str:
-    """Resolveer een SKOS prefLabel naar concept-URI's in een named graph.
+    """Resolveer een SKOS prefLabel in een specifieke named graph.
 
-    Geeft alle matches terug met URI en rdf:type. De client kiest welke
-    relevant is. De resolver kiest niet zelf.
+    Gebruik graph_name="owms" alleen voor overheidstermen zoals gemeenten en provincies.
+    Gebruik deze tool niet blind voor functies, juridische status of monumentaard.
+    Raadpleeg eerst semantics_describe_topic() en graphs_list() wanneer je niet weet
+    in welke graph een concept staat.
     """
     matches = resolve_label(label, graph_name=graph_name, lang=lang)
 

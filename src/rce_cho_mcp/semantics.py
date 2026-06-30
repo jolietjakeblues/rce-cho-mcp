@@ -15,7 +15,9 @@ SEMANTIC_TOPICS = {
                 ],
                 "guidance": (
                     "Gebruik dit pad vaak als eerste bij vragen als boerderijen, "
-                    "kerken, molens, scholen of fabrieken."
+                    "kerken, begraafplaatsen, kerkhoven, molens, scholen of fabrieken. "
+                    "Gebruik hiervoor niet OWMS. Functies lopen via functiepaden naar "
+                    "ceo:heeftFunctieNaam en daarna skos:prefLabel."
                 ),
             },
             {
@@ -27,7 +29,8 @@ SEMANTIC_TOPICS = {
                 ],
                 "guidance": (
                     "Gebruik dit pad wanneer de vraag expliciet gaat over huidig "
-                    "gebruik of actuele functie."
+                    "gebruik of actuele functie. Gebruik hiervoor niet OWMS; OWMS is "
+                    "voor overheidstermen zoals gemeenten en provincies."
                 ),
             },
         ],
@@ -52,7 +55,10 @@ SEMANTIC_TOPICS = {
                 ],
                 "guidance": (
                     "Gebruik dit pad voor vragen over actieve rijksmonumenten of "
-                    "juridische status. Gebruik hiervoor niet ceo:registergegeven."
+                    "juridische status. 'Rijksmonument' is hier een juridische "
+                    "statuswaarde, geen OWMS-concept. Gebruik dus niet "
+                    "resolve_concept_label('rijksmonument', graph_name='owms'). "
+                    "Gebruik hiervoor ook niet ceo:registergegeven."
                 ),
             },
         ],
@@ -76,7 +82,8 @@ SEMANTIC_TOPICS = {
                 ],
                 "guidance": (
                     "Gebruik dit pad bij vragen over gebouwde of archeologische "
-                    "rijksmonumenten."
+                    "rijksmonumenten. 'Archeologisch' is monumentaard, geen functie "
+                    "en geen OWMS-concept."
                 ),
             },
         ],
