@@ -12,7 +12,6 @@ def main() -> None:
     mcp.settings.port = port
     mcp.settings.stateless_http = True
     mcp.settings.json_response = True
-    mcp.settings.allowed_hosts = ["*"]
 
     mcp.run(transport="streamable-http")
 
