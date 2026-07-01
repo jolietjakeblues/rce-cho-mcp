@@ -11,7 +11,7 @@ from rce_cho_mcp.ontology.api import (
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.resolver import describe_resource, resolve_label
 from rce_cho_mcp.semantics import format_topic, format_topics
-from rce_cho_mcp.sparql import SPARQL_ENDPOINT, classify_error, execute_sparql, format_results
+from rce_cho_mcp.sparql import SPARQL_ENDPOINT, classify_error, execute_sparql, format_results, to_geojson
 from rce_cho_mcp.graphs import format_graphs
 from rce_cho_mcp.validator import format_validation_report, validate_sparql
 
@@ -173,6 +173,40 @@ def query_sparql_json(sparql_query: str) -> dict:
             "type": type(e).__name__,
             "message": str(e),
         }
+
+@mcp.tool()
+def query_sparql_geojson(sparql_query: str, wkt_var: str = "wkt") -> dict:
+    """Voer een SPARQL SELECT query uit en geef het resultaat terug als GeoJSON FeatureCollection.
+
+    wkt_var: naam van de resultaatvariabele die de WKT-geometrie bevat (standaard: 'wkt').
+    Ondersteunt POINT, POLYGON en MULTIPOLYGON in WGS84.
+    Alle overige variabelen worden als feature properties meegenomen.
+    Rijen zonder geldige geometrie worden overgeslagen (zie '_skipped' in het resultaat).
+
+    Gebruik geo:asWKT in de query om geometrieën op te halen. Voeg toe aan de query:
+    PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+    """
+    try:
+        data = execute_sparql(sparql_query)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return {
+            "error": code,
+            "status": e.code,
+            "advies": advies,
+            "endpoint": SPARQL_ENDPOINT,
+            "body": body[:500],
+        }
+    except Exception as e:
+        return {
+            "error": "unexpected_error",
+            "type": type(e).__name__,
+            "message": str(e),
+        }
+
+    return to_geojson(data, wkt_var=wkt_var)
+
 
 def main() -> None:
     mcp.run()

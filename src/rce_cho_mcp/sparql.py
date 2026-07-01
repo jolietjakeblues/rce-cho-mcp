@@ -1,4 +1,5 @@
 import json
+import re
 import urllib.parse
 import urllib.request
 
@@ -79,3 +80,76 @@ def format_results(data: dict, max_rows: int = 100) -> str:
         lines.append(" | ".join(values))
 
     return "\n".join(lines)
+
+
+# Matches WKT literals with an optional datatype suffix, e.g.:
+# POINT(4.9041 52.3676)
+# POINT(4.9041 52.3676)^^<http://www.opengis.net/ont/geosparql#wktLiteral>
+_WKT_STRIP = re.compile(r"\^\^<[^>]+>$")
+
+_POINT_RE = re.compile(r"^POINT\s*\(\s*([0-9.eE+-]+)\s+([0-9.eE+-]+)\s*\)$", re.IGNORECASE)
+_POLYGON_RE = re.compile(r"^POLYGON\s*\(\((.+)\)\)$", re.IGNORECASE | re.DOTALL)
+_MULTIPOLYGON_RE = re.compile(r"^MULTIPOLYGON\s*\(\((.+)\)\)$", re.IGNORECASE | re.DOTALL)
+
+
+def _parse_coord_pair(pair: str) -> list[float]:
+    lon, lat = pair.strip().split()
+    return [float(lon), float(lat)]
+
+
+def _parse_ring(ring_str: str) -> list[list[float]]:
+    return [_parse_coord_pair(p) for p in ring_str.strip().split(",")]
+
+
+def wkt_to_geometry(wkt: str) -> dict | None:
+    """Parse a WKT string to a GeoJSON geometry dict. Returns None on failure."""
+    wkt = _WKT_STRIP.sub("", wkt).strip()
+
+    m = _POINT_RE.match(wkt)
+    if m:
+        return {"type": "Point", "coordinates": [float(m.group(1)), float(m.group(2))]}
+
+    m = _POLYGON_RE.match(wkt)
+    if m:
+        return {"type": "Polygon", "coordinates": [_parse_ring(m.group(1))]}
+
+    m = _MULTIPOLYGON_RE.match(wkt)
+    if m:
+        # Split on ")(" to get individual polygon rings
+        rings = [_parse_ring(r) for r in re.split(r"\)\s*,\s*\(", m.group(1))]
+        return {"type": "MultiPolygon", "coordinates": [[ring] for ring in rings]}
+
+    return None
+
+
+def to_geojson(data: dict, wkt_var: str = "wkt") -> dict:
+    """Convert SPARQL JSON results to a GeoJSON FeatureCollection.
+
+    wkt_var: the name of the result variable that contains the WKT geometry.
+    All other variables become feature properties.
+    Rows without a valid geometry are skipped.
+    """
+    bindings = data.get("results", {}).get("bindings", [])
+    variables = data.get("head", {}).get("vars", [])
+    prop_vars = [v for v in variables if v != wkt_var]
+
+    features = []
+    skipped = 0
+
+    for row in bindings:
+        raw_wkt = row.get(wkt_var, {}).get("value", "")
+        geometry = wkt_to_geometry(raw_wkt) if raw_wkt else None
+
+        if geometry is None:
+            skipped += 1
+            continue
+
+        properties = {v: row[v]["value"] for v in prop_vars if v in row}
+        features.append({"type": "Feature", "geometry": geometry, "properties": properties})
+
+    result = {"type": "FeatureCollection", "features": features}
+
+    if skipped:
+        result["_skipped"] = skipped
+
+    return result
