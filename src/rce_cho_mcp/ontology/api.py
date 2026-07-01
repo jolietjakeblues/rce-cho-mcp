@@ -12,8 +12,6 @@ __all__ = [
     "describe_property",
     "get_classes",
     "get_properties",
-    "list_classes",
-    "list_properties",
     "search_ontology",
     "statistics",
 ]

@@ -193,16 +193,15 @@ Controleert SPARQL-query's op bekende valkuilen.
 
 Huidige tools:
 
-- `validate_query`
-- `validate_query_structured`
-
 Voorbeelden van controles:
-
 - verdachte prefixes
 - onjuiste `SELECT/FROM/WHERE` volgorde
 - ontbreken van `DISTINCT`
 - `COUNT` zonder alias
 - query zonder `FROM` of `GRAPH` als waarschuwing, niet als fout
+- gebruik van `skos:prefLabel`-gebonden variabelen in FILTER zonder `STR()` (stille nul-resultaten)
+- GeoSPARQL-relaties die structureel timeout veroorzaken op Virtuoso (`geof:sfWithin` e.d.)
+- `GROUP BY` op lange tekstvelden (`ceo:omschrijving`, `ceo:naam`) die Virtuoso-overflowfouten geven
 
 ### 7. Execution
 
@@ -226,6 +225,15 @@ SPARQL endpoint
     ↓
 JSON resultaat
 ```
+
+Bij fouten classificeert `query_sparql` de foutmelding:
+
+- `TIMEOUT` — query afgebroken wegens tijdslimiet
+- `GROUPBY_OVERFLOW` — Virtuoso kan lange tekstvelden niet groeperen
+- `SYNTAX` — SPARQL-syntaxfout
+- `ENDPOINT_UNAVAILABLE` — endpoint tijdelijk niet bereikbaar
+
+Elke foutcode wordt vergezeld van een concreet advies voor de vervolgstap.
 
 ## Belangrijk ontwerpprincipe
 

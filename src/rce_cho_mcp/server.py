@@ -81,7 +81,10 @@ def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl"
     Gebruik altijd eerst deze tool om de concept-URI op te halen, en filter of
     join daarna op die URI in plaats van op de labeltekst.
     """
-    matches = resolve_label(label, graph_name=graph_name, lang=lang)
+    try:
+        matches = resolve_label(label, graph_name=graph_name, lang=lang)
+    except (ValueError, RuntimeError) as e:
+        return f"Fout bij resolven van label '{label}': {e}"
 
     if not matches:
         return f"Geen concept gevonden voor label '{label}' in graph:{graph_name}."
@@ -97,7 +100,10 @@ def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl"
 @mcp.tool()
 def describe_resource_uri(uri: str) -> str:
     """Beschrijf een resource: alle predicaten en waarden van een URI in de RCE-graph."""
-    facts = describe_resource(uri)
+    try:
+        facts = describe_resource(uri)
+    except RuntimeError as e:
+        return f"Fout bij opvragen van resource: {e}"
 
     if not facts:
         return f"Geen gegevens gevonden voor resource: {uri}"

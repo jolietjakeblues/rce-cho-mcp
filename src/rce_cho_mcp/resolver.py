@@ -1,19 +1,12 @@
-from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH
+import urllib.error
+
+from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KNOWN_GRAPHS
 from rce_cho_mcp.sparql import execute_sparql
 
 
 PREFIXES = """PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 """
-
-
-ALLOWED_GRAPH_NAMES = {
-    "owms",
-    "instanties-rce",
-    "kennisregistratie-rce",
-    "bronnen-rce",
-    "void",
-}
 
 
 def _escape_sparql_string(value: str) -> str:
@@ -23,8 +16,8 @@ def _escape_sparql_string(value: str) -> str:
 
 def _validate_graph_name(graph_name: str) -> None:
     """Allow only known short graph names for graph:localName syntax."""
-    if graph_name not in ALLOWED_GRAPH_NAMES:
-        allowed = ", ".join(sorted(ALLOWED_GRAPH_NAMES))
+    if graph_name not in KNOWN_GRAPHS:
+        allowed = ", ".join(sorted(KNOWN_GRAPHS.keys()))
         raise ValueError(
             f"Unknown graph_name '{graph_name}'. Allowed: {allowed}"
         )
@@ -63,7 +56,18 @@ WHERE {{
 }}
 """
 
-    data = execute_sparql(query)
+    try:
+        data = execute_sparql(query)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"HTTP fout {e.code} bij resolven van label '{label}': {body[:300]}"
+        ) from e
+    except Exception as e:
+        raise RuntimeError(
+            f"Fout bij resolven van label '{label}': {type(e).__name__}: {e}"
+        ) from e
+
     bindings = data.get("results", {}).get("bindings", [])
 
     results: dict[str, dict] = {}
@@ -87,7 +91,6 @@ WHERE {{
 
     return list(results.values())
 
-
 def describe_resource(
     uri: str,
     graph: str = DEFAULT_DATASET_GRAPH,
@@ -101,7 +104,18 @@ WHERE {{
 }}
 """
 
-    data = execute_sparql(query)
+    try:
+        data = execute_sparql(query)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"HTTP fout {e.code} bij opvragen van resource '{uri}': {body[:300]}"
+        ) from e
+    except Exception as e:
+        raise RuntimeError(
+            f"Fout bij opvragen van resource '{uri}': {type(e).__name__}: {e}"
+        ) from e
+
     bindings = data.get("results", {}).get("bindings", [])
 
     return [

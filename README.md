@@ -30,6 +30,7 @@ Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
 * Validate SPARQL queries before execution.
 * Execute SPARQL SELECT and ASK queries.
 * Provide dataset semantics for important modelling patterns.
+* Detect known Virtuoso-specific query pitfalls before execution.
 
 ## Linked Data philosophy
 
@@ -122,12 +123,20 @@ Relevant triples may be spread across multiple named graphs.
 * `validate_query`
 * `validate_query_structured`
 
+### Validation checks include:
+
+* unsafe label filters (silent zero-result risk)
+* missing `DISTINCT` or `COUNT` alias
+* `SELECT/FROM/WHERE` ordering
+* GeoSPARQL relations that cause structural timeouts on Virtuoso (`geof:sfWithin` etc.)
+* `GROUP BY` on long text fields that trigger Virtuoso overflow errors
+
 ### Execution
 
 * `query_sparql`
 * `query_sparql_json`
 
-`query_sparql` returns readable text for humans.  
+`query_sparql` returns readable text with classified error codes on failure.  
 `query_sparql_json` returns raw SPARQL JSON for agents, tables, benchmarks and follow-up processing.
 
 ## Why dataset semantics?
