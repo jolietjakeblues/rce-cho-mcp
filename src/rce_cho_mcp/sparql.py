@@ -21,6 +21,35 @@ def execute_sparql(query: str, timeout: int = 30) -> dict:
     with urllib.request.urlopen(request, timeout=timeout) as response:
         raw = response.read().decode("utf-8")
         return json.loads(raw)
+    
+def classify_error(body: str, http_code: int) -> tuple[str, str]:
+    """Classificeer een bekende Virtuoso- of endpointfout."""
+    b = body.lower()
+    if "value of any type column too long" in b:
+        return (
+            "GROUPBY_OVERFLOW",
+            "Virtuoso kan dit veld niet groeperen (tekst te lang voor GROUP BY). "
+            "Herschrijf de query met een subquery op twee niveaus: haal eerst de "
+            "URI's op in een subquery, join daarna de lange tekstvelden buiten de GROUP BY.",
+        )
+    if "timeout" in b or "rdfr20" in b or http_code == 503:
+        return (
+            "TIMEOUT",
+            "Het endpoint heeft de query afgebroken wegens een tijdslimiet. "
+            "Voeg een LIMIT toe, verklein het bereik, of splits de query op.",
+        )
+    if "sparql compiler" in b or "sp029" in b or "syntax" in b:
+        return (
+            "SYNTAX",
+            "De SPARQL-query bevat een syntaxfout. "
+            "Gebruik validate_query() om de fout op te sporen.",
+        )
+    if http_code == 503:
+        return (
+            "ENDPOINT_UNAVAILABLE",
+            "Het RCE CHO endpoint is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
+        )
+    return ("HTTP_ERROR", f"HTTP {http_code}: onbekende fout van het endpoint.")
 
 
 def format_results(data: dict, max_rows: int = 100) -> str:

@@ -28,6 +28,50 @@ FILTER_BLOCK_PATTERN = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# Detecteer GROUP BY in combinatie met variabelen die gebonden zijn via
+# omschrijving- of naam-paden (lange tekstvelden die Virtuoso niet kan groeperen).
+LONG_TEXT_BINDINGS = re.compile(
+    r"ceo:(?:heeftOmschrijving|omschrijving|heeftNaam|naam)\s+\?(\w+)",
+    re.IGNORECASE,
+)
+
+GEOSPARQL_RELATIONS = re.compile(
+    r"geof:(?:sfWithin|sfContains|sfIntersects|sfOverlaps|sfTouches|sfCrosses)",
+    re.IGNORECASE,
+)
+
+def _find_geosparql_timeout_risk(query: str) -> list[str]:
+    """Detecteer GeoSPARQL-relaties die structureel timeout veroorzaken op Virtuoso."""
+    matches = GEOSPARQL_RELATIONS.findall(query)
+    if not matches:
+        return []
+    found = ", ".join(set(matches))
+    return [
+        f"Gevonden: {found}. Ruimtelijke joins met geof:sfWithin e.d. lopen "
+        "structureel vast op dit Virtuoso-endpoint (timeout). "
+        "Gebruik een tweetraps-aanpak: haal WKT-geometrieën eerst op via query_sparql(), "
+        "voer de ruimtelijke join daarna lokaal uit (bijv. met Shapely in Python)."
+    ]
+
+def _find_groupby_overflow_risk(query: str) -> list[str]:
+    """Detecteer GROUP BY met lange tekstvelden die Virtuoso niet kan verwerken."""
+    if "GROUP BY" not in query.upper():
+        return []
+
+    risky_vars = set(LONG_TEXT_BINDINGS.findall(query))
+    if not risky_vars:
+        return []
+
+    warnings = []
+    for var in risky_vars:
+        groupby_pattern = re.compile(rf"GROUP\s+BY\b.*\?{re.escape(var)}\b", re.IGNORECASE | re.DOTALL)
+        if groupby_pattern.search(query):
+            warnings.append(
+                f"?{var} is gebonden via een omschrijving- of naampad en staat in GROUP BY. "
+                "Virtuoso geeft hier de fout 'Value of ANY type column too long'. "
+                "Herschrijf: haal ?{var} op buiten de GROUP BY via een subquery op twee niveaus."
+            )
+    return warnings
 
 def _find_unsafe_label_filters(query: str) -> list[str]:
     """Detect FILTER expressions that compare a skos:prefLabel-bound
@@ -103,7 +147,8 @@ def validate_sparql(query: str) -> dict:
             )
 
     warnings.extend(_find_unsafe_label_filters(q))
-
+    warnings.extend(_find_groupby_overflow_risk(q))
+    warnings.extend(_find_geosparql_timeout_risk(q))
 
     select_pos = q_upper.find("SELECT")
     from_pos = q_upper.find("FROM")
