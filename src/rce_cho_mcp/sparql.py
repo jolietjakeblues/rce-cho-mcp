@@ -32,7 +32,7 @@ def classify_error(body: str, http_code: int) -> tuple[str, str]:
             "Herschrijf de query met een subquery op twee niveaus: haal eerst de "
             "URI's op in een subquery, join daarna de lange tekstvelden buiten de GROUP BY.",
         )
-    if "timeout" in b or "rdfr20" in b or http_code == 503:
+    if "timeout" in b or "rdfr20" in b:
         return (
             "TIMEOUT",
             "Het endpoint heeft de query afgebroken wegens een tijdslimiet. "

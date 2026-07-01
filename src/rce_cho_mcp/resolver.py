@@ -4,8 +4,7 @@ from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KNOWN_GRAPHS
 from rce_cho_mcp.sparql import execute_sparql
 
 
-PREFIXES = """PREFIX graph: <https://linkeddata.cultureelerfgoed.nl/graph/>
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIXES = """PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 """
 
 
@@ -44,12 +43,13 @@ def resolve_label(
     _validate_graph_name(graph_name)
 
     safe_label = _escape_sparql_string(label)
+    graph_uri = KNOWN_GRAPHS[graph_name]
 
     query = f"""{PREFIXES}
 
 SELECT DISTINCT ?concept ?type
 WHERE {{
-  GRAPH graph:{graph_name} {{
+  GRAPH <{graph_uri}> {{
     ?concept skos:prefLabel "{safe_label}"@{lang} .
     OPTIONAL {{ ?concept a ?type . }}
   }}

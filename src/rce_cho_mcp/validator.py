@@ -69,7 +69,7 @@ def _find_groupby_overflow_risk(query: str) -> list[str]:
             warnings.append(
                 f"?{var} is gebonden via een omschrijving- of naampad en staat in GROUP BY. "
                 "Virtuoso geeft hier de fout 'Value of ANY type column too long'. "
-                "Herschrijf: haal ?{var} op buiten de GROUP BY via een subquery op twee niveaus."
+                f"Herschrijf: haal ?{var} op buiten de GROUP BY via een subquery op twee niveaus."
             )
     return warnings
 
