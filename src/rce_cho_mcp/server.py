@@ -73,6 +73,13 @@ def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl"
     Gebruik deze tool niet blind voor functies, juridische status of monumentaard.
     Raadpleeg eerst semantics_describe_topic() en graphs_list() wanneer je niet weet
     in welke graph een concept staat.
+
+    BELANGRIJK: skos:prefLabel-waarden zijn taalgetagd (bv. "Zwolle"@nl). Filter
+    of match nooit rechtstreeks op een label-string in zelfgeschreven SPARQL
+    (bv. FILTER(?label = "Zwolle") of FILTER(?label IN (...))) — dat matcht een
+    taalgetagde RDF-term niet en geeft stil 0 resultaten, zonder foutmelding.
+    Gebruik altijd eerst deze tool om de concept-URI op te halen, en filter of
+    join daarna op die URI in plaats van op de labeltekst.
     """
     matches = resolve_label(label, graph_name=graph_name, lang=lang)
 
@@ -112,7 +119,15 @@ def validate_query_structured(sparql_query: str) -> dict:
 
 @mcp.tool()
 def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
-    """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint."""
+    """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint.
+
+    Let op: skos:prefLabel-waarden zijn taalgetagd (bv. "Zwolle"@nl). Een
+    FILTER die een labelvariabele vergelijkt met een kale string (FILTER(?label
+    = "Zwolle") of FILTER(?label IN (...))) geeft stil 0 resultaten, zonder
+    fout. Gebruik resolve_concept_label() om eerst de concept-URI op te
+    halen, of wrap de vergelijking in STR(). Gebruik validate_query_structured()
+    om dit patroon vooraf te laten controleren.
+    """
     try:
         data = execute_sparql(sparql_query)
         return format_results(data, max_rows=max_rows)
