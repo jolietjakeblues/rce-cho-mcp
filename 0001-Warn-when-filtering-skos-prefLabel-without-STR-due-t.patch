@@ -1,0 +1,177 @@
+From 513b2c3e02b85b3a27a74b6249d53a2e26ae549a Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Wed, 1 Jul 2026 06:50:42 +0000
+Subject: [PATCH] Warn when filtering skos:prefLabel without STR() due to
+ language tags
+
+Labels in this dataset (e.g. gemeente names via OWMS) are language-tagged
+("Zwolle"@nl). A FILTER that compares a label-bound variable directly to a
+plain string literal (FILTER(?label = "Zwolle") or
+FILTER(?label IN (...))) silently returns zero results instead of erroring,
+because the plain string never matches the language-tagged RDF term.
+
+Changes:
+- validator.py: new _find_unsafe_label_filters() check, wired into
+  validate_sparql(). Flags FILTER expressions using a skos:prefLabel-bound
+  variable without STR().
+- resolver.py: resolve_label() docstring now states the pitfall and the
+  recommended fix (resolve label to URI first, filter/join on the URI).
+- server.py: resolve_concept_label() and query_sparql() tool docstrings
+  updated with the same warning, so it's visible to callers that only see
+  individual tool descriptions rather than the server-wide instructions
+  text.
+
+Motivated by a live session where a gemeente-count query
+(FILTER(?gemeenteLabel IN ("Zwolle", "Amersfoort"))) silently returned zero
+rows; the fix required discovering, via trial and error, that filtering
+needed to happen on the OWMS concept URI instead of the label string.
+---
+ src/rce_cho_mcp/resolver.py  |  8 +++++
+ src/rce_cho_mcp/server.py    | 17 +++++++++-
+ src/rce_cho_mcp/validator.py | 65 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 89 insertions(+), 1 deletion(-)
+
+diff --git a/src/rce_cho_mcp/resolver.py b/src/rce_cho_mcp/resolver.py
+index ecac829..d439f5b 100644
+--- a/src/rce_cho_mcp/resolver.py
++++ b/src/rce_cho_mcp/resolver.py
+@@ -39,6 +39,14 @@ def resolve_label(
+ 
+     Returns every match with its URI and type(s). The caller decides which
+     result is relevant. The resolver does not guess.
++
++    IMPORTANT: prefLabel values in this dataset are language-tagged
++    (e.g. "Zwolle"@nl). Do not filter or match on skos:prefLabel strings
++    directly in hand-written SPARQL (e.g. FILTER(?label = "Zwolle") or
++    FILTER(?label IN (...))) — a plain string literal will not match a
++    language-tagged RDF term and the query will silently return zero
++    results. Call this resolver first to get the concept URI, then filter
++    or join on that URI instead of on the label text.
+     """
+     _validate_graph_name(graph_name)
+ 
+diff --git a/src/rce_cho_mcp/server.py b/src/rce_cho_mcp/server.py
+index a23bb21..13b5ab4 100644
+--- a/src/rce_cho_mcp/server.py
++++ b/src/rce_cho_mcp/server.py
+@@ -73,6 +73,13 @@ def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl"
+     Gebruik deze tool niet blind voor functies, juridische status of monumentaard.
+     Raadpleeg eerst semantics_describe_topic() en graphs_list() wanneer je niet weet
+     in welke graph een concept staat.
++
++    BELANGRIJK: skos:prefLabel-waarden zijn taalgetagd (bv. "Zwolle"@nl). Filter
++    of match nooit rechtstreeks op een label-string in zelfgeschreven SPARQL
++    (bv. FILTER(?label = "Zwolle") of FILTER(?label IN (...))) — dat matcht een
++    taalgetagde RDF-term niet en geeft stil 0 resultaten, zonder foutmelding.
++    Gebruik altijd eerst deze tool om de concept-URI op te halen, en filter of
++    join daarna op die URI in plaats van op de labeltekst.
+     """
+     matches = resolve_label(label, graph_name=graph_name, lang=lang)
+ 
+@@ -112,7 +119,15 @@ def validate_query_structured(sparql_query: str) -> dict:
+ 
+ @mcp.tool()
+ def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
+-    """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint."""
++    """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint.
++
++    Let op: skos:prefLabel-waarden zijn taalgetagd (bv. "Zwolle"@nl). Een
++    FILTER die een labelvariabele vergelijkt met een kale string (FILTER(?label
++    = "Zwolle") of FILTER(?label IN (...))) geeft stil 0 resultaten, zonder
++    fout. Gebruik resolve_concept_label() om eerst de concept-URI op te
++    halen, of wrap de vergelijking in STR(). Gebruik validate_query_structured()
++    om dit patroon vooraf te laten controleren.
++    """
+     try:
+         data = execute_sparql(sparql_query)
+         return format_results(data, max_rows=max_rows)
+diff --git a/src/rce_cho_mcp/validator.py b/src/rce_cho_mcp/validator.py
+index cc8a147..0714402 100644
+--- a/src/rce_cho_mcp/validator.py
++++ b/src/rce_cho_mcp/validator.py
+@@ -1,3 +1,5 @@
++import re
++
+ from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH
+ 
+ 
+@@ -13,6 +15,66 @@ FORBIDDEN_LANGUAGE_FILTERS = [
+     "langmatches(",
+ ]
+ 
++# Matches "skos:prefLabel ?varname", used to find variables bound to a
++# (likely language-tagged) label literal.
++LABEL_BINDING_PATTERN = re.compile(
++    r"skos:prefLabel\s+\?(\w+)",
++    re.IGNORECASE,
++)
++
++# Matches "FILTER(...)" blocks so we can inspect their contents in isolation.
++FILTER_BLOCK_PATTERN = re.compile(
++    r"FILTER\s*\((.*?)\)\s*(?=\.|\}|FILTER|$)",
++    re.IGNORECASE | re.DOTALL,
++)
++
++
++def _find_unsafe_label_filters(query: str) -> list[str]:
++    """Detect FILTER expressions that compare a skos:prefLabel-bound
++    variable directly to a string literal, without STR().
++
++    Labels in this dataset are frequently language-tagged (e.g. "Zwolle"@nl).
++    Comparing such a variable to a plain string in a FILTER (e.g.
++    FILTER(?label = "Zwolle") or FILTER(?label IN ("Zwolle", "Amersfoort")))
++    does not match the language-tagged RDF term and silently returns zero
++    results, with no error. Wrapping in STR(), or resolving the label to a
++    URI first via resolve_concept_label(), avoids this.
++    """
++    label_vars = set(LABEL_BINDING_PATTERN.findall(query))
++
++    if not label_vars:
++        return []
++
++    warnings: list[str] = []
++
++    for filter_body in FILTER_BLOCK_PATTERN.findall(query):
++        for var in label_vars:
++            var_pattern = re.compile(rf"\?{re.escape(var)}\b")
++
++            if not var_pattern.search(filter_body):
++                continue
++
++            # If STR() already wraps the variable somewhere in this filter,
++            # treat it as safe.
++            str_wrapped = re.search(
++                rf"STR\s*\(\s*\?{re.escape(var)}\s*\)", filter_body, re.IGNORECASE
++            )
++
++            if str_wrapped:
++                continue
++
++            warnings.append(
++                f"FILTER gebruikt ?{var}, dat gebonden is via skos:prefLabel, "
++                "zonder STR(). Labels zijn vaak taalgetagd (bv. \"Zwolle\"@nl); "
++                f"een vergelijking als FILTER(?{var} = \"...\") of "
++                f"FILTER(?{var} IN (...)) matcht dan niets en geeft stil 0 "
++                f"resultaten. Gebruik STR(?{var}) = \"...\", of resolveer het "
++                "label eerst naar een URI met resolve_concept_label() en "
++                "filter/join op die URI in plaats van op de labeltekst."
++            )
++
++    return warnings
++
+ 
+ def validate_sparql(query: str) -> dict:
+     """Validate a SPARQL query against known RCE CHO pitfalls.
+@@ -40,6 +102,9 @@ def validate_sparql(query: str) -> dict:
+                 "Controleer of labels in deze data daadwerkelijk taalgetagd zijn."
+             )
+ 
++    warnings.extend(_find_unsafe_label_filters(q))
++
++
+     select_pos = q_upper.find("SELECT")
+     from_pos = q_upper.find("FROM")
+     where_pos = q_upper.find("WHERE")
+-- 
+2.43.0
+
