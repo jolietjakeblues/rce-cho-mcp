@@ -39,6 +39,14 @@ def resolve_label(
 
     Returns every match with its URI and type(s). The caller decides which
     result is relevant. The resolver does not guess.
+
+    IMPORTANT: prefLabel values in this dataset are language-tagged
+    (e.g. "Zwolle"@nl). Do not filter or match on skos:prefLabel strings
+    directly in hand-written SPARQL (e.g. FILTER(?label = "Zwolle") or
+    FILTER(?label IN (...))) — a plain string literal will not match a
+    language-tagged RDF term and the query will silently return zero
+    results. Call this resolver first to get the concept URI, then filter
+    or join on that URI instead of on the label text.
     """
     _validate_graph_name(graph_name)
 

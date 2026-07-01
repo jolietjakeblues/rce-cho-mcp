@@ -1,3 +1,5 @@
+import re
+
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH
 
 
@@ -12,6 +14,66 @@ FORBIDDEN_LANGUAGE_FILTERS = [
     "LANGMATCHES(",
     "langmatches(",
 ]
+
+# Matches "skos:prefLabel ?varname", used to find variables bound to a
+# (likely language-tagged) label literal.
+LABEL_BINDING_PATTERN = re.compile(
+    r"skos:prefLabel\s+\?(\w+)",
+    re.IGNORECASE,
+)
+
+# Matches "FILTER(...)" blocks so we can inspect their contents in isolation.
+FILTER_BLOCK_PATTERN = re.compile(
+    r"FILTER\s*\((.*?)\)\s*(?=\.|\}|FILTER|$)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _find_unsafe_label_filters(query: str) -> list[str]:
+    """Detect FILTER expressions that compare a skos:prefLabel-bound
+    variable directly to a string literal, without STR().
+
+    Labels in this dataset are frequently language-tagged (e.g. "Zwolle"@nl).
+    Comparing such a variable to a plain string in a FILTER (e.g.
+    FILTER(?label = "Zwolle") or FILTER(?label IN ("Zwolle", "Amersfoort")))
+    does not match the language-tagged RDF term and silently returns zero
+    results, with no error. Wrapping in STR(), or resolving the label to a
+    URI first via resolve_concept_label(), avoids this.
+    """
+    label_vars = set(LABEL_BINDING_PATTERN.findall(query))
+
+    if not label_vars:
+        return []
+
+    warnings: list[str] = []
+
+    for filter_body in FILTER_BLOCK_PATTERN.findall(query):
+        for var in label_vars:
+            var_pattern = re.compile(rf"\?{re.escape(var)}\b")
+
+            if not var_pattern.search(filter_body):
+                continue
+
+            # If STR() already wraps the variable somewhere in this filter,
+            # treat it as safe.
+            str_wrapped = re.search(
+                rf"STR\s*\(\s*\?{re.escape(var)}\s*\)", filter_body, re.IGNORECASE
+            )
+
+            if str_wrapped:
+                continue
+
+            warnings.append(
+                f"FILTER gebruikt ?{var}, dat gebonden is via skos:prefLabel, "
+                "zonder STR(). Labels zijn vaak taalgetagd (bv. \"Zwolle\"@nl); "
+                f"een vergelijking als FILTER(?{var} = \"...\") of "
+                f"FILTER(?{var} IN (...)) matcht dan niets en geeft stil 0 "
+                f"resultaten. Gebruik STR(?{var}) = \"...\", of resolveer het "
+                "label eerst naar een URI met resolve_concept_label() en "
+                "filter/join op die URI in plaats van op de labeltekst."
+            )
+
+    return warnings
 
 
 def validate_sparql(query: str) -> dict:
@@ -39,6 +101,9 @@ def validate_sparql(query: str) -> dict:
                 f"Taalfilter gevonden: {term}. "
                 "Controleer of labels in deze data daadwerkelijk taalgetagd zijn."
             )
+
+    warnings.extend(_find_unsafe_label_filters(q))
+
 
     select_pos = q_upper.find("SELECT")
     from_pos = q_upper.find("FROM")
