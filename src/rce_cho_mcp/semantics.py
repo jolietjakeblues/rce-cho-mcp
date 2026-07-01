@@ -151,7 +151,11 @@ SEMANTIC_TOPICS = {
                     "Gebruik geen geof:sfWithin of andere GeoSPARQL-relaties voor ruimtelijke "
                     "joins — deze veroorzaken structurele timeouts op het Virtuoso-endpoint. "
                     "Haal in plaats daarvan de WKT-geometrieën op via query_sparql() en voer "
-                    "de ruimtelijke join daarna lokaal uit met Shapely in Python."
+                    "de ruimtelijke join daarna lokaal uit met Shapely in Python. "
+                    "Let op: de graph 'linies' gebruikt ceo:asWKT-RD met Rijksdriehoekscoördinaten "
+                    "(EPSG:28992), niet WGS84. query_sparql_geojson() slaat die rijen automatisch "
+                    "over (zichtbaar als '_skipped' in het resultaat). Gebruik voor linies een "
+                    "aparte conversie van RD naar WGS84 vóór visualisatie."
                 ),
             },
             {

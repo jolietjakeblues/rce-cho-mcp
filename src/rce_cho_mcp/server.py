@@ -11,7 +11,7 @@ from rce_cho_mcp.ontology.api import (
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.resolver import describe_resource, resolve_label
 from rce_cho_mcp.semantics import format_topic, format_topics
-from rce_cho_mcp.sparql import SPARQL_ENDPOINT, classify_error, execute_sparql, format_results, to_geojson
+from rce_cho_mcp.sparql import SPARQL_ENDPOINT, classify_error, execute_sparql, format_results, rd_to_wgs84, to_geojson
 from rce_cho_mcp.graphs import format_graphs
 from rce_cho_mcp.validator import format_validation_report, validate_sparql
 
@@ -175,11 +175,18 @@ def query_sparql_json(sparql_query: str) -> dict:
         }
 
 @mcp.tool()
-def query_sparql_geojson(sparql_query: str, wkt_var: str = "wkt") -> dict:
+def query_sparql_geojson(
+    sparql_query: str,
+    wkt_var: str = "wkt",
+    convert_rd: bool = False,
+) -> dict:
     """Voer een SPARQL SELECT query uit en geef het resultaat terug als GeoJSON FeatureCollection.
 
     wkt_var: naam van de resultaatvariabele die de WKT-geometrie bevat (standaard: 'wkt').
-    Ondersteunt POINT, POLYGON en MULTIPOLYGON in WGS84.
+    convert_rd: zet op True wanneer de query RD-coördinaten (EPSG:28992) oplevert,
+                bijvoorbeeld bij de graph 'linies' (ceo:asWKT-RD). De coördinaten
+                worden dan automatisch omgezet naar WGS84.
+    Ondersteunt POINT, POLYGON en MULTIPOLYGON.
     Alle overige variabelen worden als feature properties meegenomen.
     Rijen zonder geldige geometrie worden overgeslagen (zie '_skipped' in het resultaat).
 
@@ -205,7 +212,20 @@ def query_sparql_geojson(sparql_query: str, wkt_var: str = "wkt") -> dict:
             "message": str(e),
         }
 
-    return to_geojson(data, wkt_var=wkt_var)
+    return to_geojson(data, wkt_var=wkt_var, convert_rd=convert_rd)
+
+
+@mcp.tool()
+def convert_rd_to_wgs84(x: float, y: float) -> dict:
+    """Converteer een enkel RD New (EPSG:28992) coördinatenpaar naar WGS84.
+
+    x: RD X-coördinaat (easting, ca. 0–300.000)
+    y: RD Y-coördinaat (northing, ca. 300.000–625.000)
+
+    Geeft {'lon': ..., 'lat': ...} terug in decimale graden.
+    """
+    lon, lat = rd_to_wgs84(x, y)
+    return {"lon": lon, "lat": lat}
 
 
 def main() -> None:
