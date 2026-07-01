@@ -128,6 +128,49 @@ SEMANTIC_TOPICS = {
             },
         ],
     },
+    "geometry": {
+        "title": "Geometrie",
+        "description": (
+            "Gebruik geometrie om locaties van monumenten op te halen als "
+            "coördinaten of WKT-geometrieën. Geometrieën zijn direct bruikbaar "
+            "voor kaartvisualisatie; geen coördinaatconversie nodig."
+        ),
+        "patterns": [
+            {
+                "name": "Puntgeometrie (WKT)",
+                "path": [
+                    "geo:hasGeometry",
+                    "geo:asWKT",
+                ],
+                "guidance": (
+                    "Gebruik dit pad om de locatie van een monument als WKT op te halen. "
+                    "Het resultaat is een POINT-waarde in WGS84 (lon lat), bijvoorbeeld "
+                    "POINT(4.9041 52.3676). Geen conversie nodig voor Leaflet of GeoJSON. "
+                    "Geometrieën staan in de graph 'punten' of 'instanties-rce'. "
+                    "Voeg PREFIX geo: <http://www.opengis.net/ont/geosparql#> toe aan de query. "
+                    "Gebruik geen geof:sfWithin of andere GeoSPARQL-relaties voor ruimtelijke "
+                    "joins — deze veroorzaken structurele timeouts op het Virtuoso-endpoint. "
+                    "Haal in plaats daarvan de WKT-geometrieën op via query_sparql() en voer "
+                    "de ruimtelijke join daarna lokaal uit met Shapely in Python."
+                ),
+            },
+            {
+                "name": "Polygoongeometrie (beschermd stadsgezicht)",
+                "path": [
+                    "geo:hasGeometry",
+                    "geo:asWKT",
+                ],
+                "guidance": (
+                    "Polygonen van beschermde stads- en dorpsgezichten staan in de graph "
+                    "'gezicht-hvdl' (URI: https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl). "
+                    "Gebruik GRAPH <https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl> "
+                    "om polygonen op te halen. Het WKT-formaat is een POLYGON in WGS84. "
+                    "Ruimtelijke joins (welke monumenten liggen binnen een stadsgezicht-polygoon) "
+                    "moeten lokaal worden uitgevoerd met Shapely; gebruik geof:sfWithin niet."
+                ),
+            },
+        ],
+    },
 }
 
 

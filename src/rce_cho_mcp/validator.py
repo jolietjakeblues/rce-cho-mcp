@@ -50,7 +50,8 @@ def _find_geosparql_timeout_risk(query: str) -> list[str]:
         f"Gevonden: {found}. Ruimtelijke joins met geof:sfWithin e.d. lopen "
         "structureel vast op dit Virtuoso-endpoint (timeout). "
         "Gebruik een tweetraps-aanpak: haal WKT-geometrieën eerst op via query_sparql(), "
-        "voer de ruimtelijke join daarna lokaal uit (bijv. met Shapely in Python)."
+        "voer de ruimtelijke join daarna lokaal uit (bijv. met Shapely in Python). "
+        "Zie ook: semantics_describe_topic('geometry')."
     ]
 
 def _find_groupby_overflow_risk(query: str) -> list[str]:
