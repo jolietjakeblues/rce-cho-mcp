@@ -99,6 +99,8 @@ Huidige topics:
 - `monument_aard`
 - `names`
 - `descriptions`
+- `identifiers`
+- `geometry`
 
 Belangrijke patronen:
 
@@ -202,6 +204,9 @@ Voorbeelden van controles:
 - gebruik van `skos:prefLabel`-gebonden variabelen in FILTER zonder `STR()` (stille nul-resultaten)
 - GeoSPARQL-relaties die structureel timeout veroorzaken op Virtuoso (`geof:sfWithin` e.d.)
 - `GROUP BY` op lange tekstvelden (`ceo:omschrijving`, `ceo:naam`) die Virtuoso-overflowfouten geven
+- `ORDER BY` gecombineerd met `OPTIONAL`-joins (veroorzaakt consistent een HTTP 504, ook met kleine `LIMIT`)
+- meerdere onafhankelijke multi-valued `OPTIONAL`-blokken in dezelfde query (cartesisch product)
+- `ceo:huisnummer` / `ceo:perceelnummer` met een kaal getal-literal i.p.v. een gequote string (stille nul-resultaten)
 
 ### 7. Execution
 
@@ -228,12 +233,32 @@ JSON resultaat
 
 Bij fouten classificeert `query_sparql` de foutmelding:
 
-- `TIMEOUT` — query afgebroken wegens tijdslimiet
+- `TIMEOUT` — query afgebroken wegens tijdslimiet (ook een kale HTTP 504 zonder 'timeout' in de body)
 - `GROUPBY_OVERFLOW` — Virtuoso kan lange tekstvelden niet groeperen
 - `SYNTAX` — SPARQL-syntaxfout
 - `ENDPOINT_UNAVAILABLE` — endpoint tijdelijk niet bereikbaar
 
 Elke foutcode wordt vergezeld van een concreet advies voor de vervolgstap.
+
+Requests naar het endpoint gaan via POST (query in de body), niet via GET:
+een query met een grote `VALUES`-clause (>~300-500 URI's, querystring
+>~30-40KB) laat GET falen met HTTP 431 "Request Header Fields Too Large".
+POST is getest tot ~255KB / ~3000 URI's zonder problemen.
+
+## Bekende performance- en datakwaliteitskenmerken
+
+- **Query-resultaat-caching**: het endpoint lijkt te cachen op exacte
+  querytekst. Een letterlijk identieke herhaling van een eerdere query komt
+  vrijwel instant terug (~0,2s); een nieuwe combinatie van patroon/`LIMIT`/
+  `OFFSET` kost stelselmatig ~13-15s, ongeacht de `OFFSET`-grootte of
+  joincomplexiteit. Voor interactief gebruik betekent dit: de eerste keer dat
+  een client een nieuwe vraag stelt is trager dan een herhaalde/geïtereerde vraag.
+- **Duplicaat-triples in de brondata**: dezelfde relatie-triple kan meerdere
+  keren voorkomen (bevestigd: 116x dezelfde BRK-relatie op één monument).
+  Tellingen en lijsten zonder `DISTINCT`/dedup kunnen hierdoor sterk vertekend
+  zijn. Test nieuwe verzamel-achtige queries niet alleen op een klein
+  eerste-resultaat, maar ook op een entiteit waarvan bekend is dat die
+  meerdere relaties van hetzelfde type heeft.
 
 ## Belangrijk ontwerpprincipe
 

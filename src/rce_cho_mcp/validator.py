@@ -40,6 +40,87 @@ GEOSPARQL_RELATIONS = re.compile(
     re.IGNORECASE,
 )
 
+OPTIONAL_BLOCK_PATTERN = re.compile(r"\bOPTIONAL\b", re.IGNORECASE)
+
+# Properties die in deze dataset ongetypeerde string-literals zijn (bv. "19"),
+# geen xsd:integer. Een kaal getal (ceo:huisnummer 19) matcht dan niets en
+# geeft stil 0 resultaten, net als het skos:prefLabel-taalfilter-probleem hieronder.
+UNTYPED_STRING_PROPERTIES = ("huisnummer", "perceelnummer")
+UNTYPED_NUMERIC_LITERAL_PATTERN = re.compile(
+    r"ceo:(" + "|".join(UNTYPED_STRING_PROPERTIES) + r")\s+(\d+)\b",
+    re.IGNORECASE,
+)
+
+
+def _find_order_by_optional_timeout_risk(query: str) -> list[str]:
+    """Detecteer ORDER BY gecombineerd met OPTIONAL-joins.
+
+    Bevestigd (2026-07): dit combinatiepatroon veroorzaakt consistent een
+    HTTP 504 op het Virtuoso-endpoint, zelfs met een kleine LIMIT -- de
+    triplestore lijkt eerst de volledige gejoinde resultatenset te sorteren
+    voordat LIMIT/OFFSET wordt toegepast.
+    """
+    if "ORDER BY" not in query.upper():
+        return []
+    if not OPTIONAL_BLOCK_PATTERN.search(query):
+        return []
+    return [
+        "ORDER BY gecombineerd met OPTIONAL-joins veroorzaakt op dit endpoint "
+        "consistent een HTTP 504 timeout, ook met een kleine LIMIT. Gebruik een "
+        "tweetraps-subquery: sorteer/pagineer eerst goedkoop op een enkele "
+        "variabele in een binnenste SELECT DISTINCT, en voeg de duurdere "
+        "OPTIONAL-joins pas toe in de buitenste query op de al-beperkte set."
+    ]
+
+
+def _find_cartesian_product_risk(query: str) -> list[str]:
+    """Detecteer meerdere onafhankelijke OPTIONAL-blokken in dezelfde query.
+
+    Bevestigd (2026-07): twee of meer multi-valued OPTIONAL-blokken in
+    dezelfde WHERE leveren een cartesisch product op (bv. 5 relaties x 3
+    relaties = 15 rijen i.p.v. de werkelijke 5+3=8 losse feiten), inclusief
+    onzinnige combinaties tussen de twee relaties. Dit valt niet op bij een
+    klein testresultaat en wordt pas zichtbaar bij entiteiten met echt
+    meerdere relaties van beide soorten.
+    """
+    count = len(OPTIONAL_BLOCK_PATTERN.findall(query))
+    if count < 2:
+        return []
+    return [
+        f"{count} OPTIONAL-blokken gevonden in dezelfde query. Als dit "
+        "onafhankelijke multi-valued relaties zijn (bv. meerdere BRK-percelen "
+        "EN meerdere BAG-adressen), levert dit een cartesisch product op "
+        "(aantal_a x aantal_b rijen i.p.v. aantal_a + aantal_b losse feiten), "
+        "inclusief onzinnige combinaties. Haal multi-valued relaties die niet "
+        "inherent aan elkaar gekoppeld zijn op in aparte queries (evt. met een "
+        "gedeelde VALUES-clause) en combineer ze in code, niet als losse "
+        "OPTIONAL-blokken in dezelfde SELECT."
+    ]
+
+
+def _find_untyped_numeric_literal_risk(query: str) -> list[str]:
+    """Detecteer een kaal getal-literal bij properties die in deze dataset
+    ongetypeerde string-literals zijn (bv. ceo:huisnummer "19", geen
+    ceo:huisnummer 19). Een numerieke vergelijking matcht hier stil niets,
+    zonder foutmelding -- net zo verraderlijk als het taalgetagde-labelfilter-
+    probleem hierboven."""
+    warnings = []
+    seen = set()
+    for match in UNTYPED_NUMERIC_LITERAL_PATTERN.finditer(query):
+        prop = match.group(1).lower()
+        if prop in seen:
+            continue
+        seen.add(prop)
+        warnings.append(
+            f"ceo:{prop} gebruikt met een kaal getal ({match.group(2)}). "
+            f"ceo:{prop} is in deze data een ongetypeerd string-literal, geen "
+            f'xsd:integer. Gebruik ceo:{prop} "{match.group(2)}" (met '
+            "aanhalingstekens) -- zonder aanhalingstekens matcht de query stil "
+            "niets, ook als het object gegarandeerd bestaat."
+        )
+    return warnings
+
+
 def _find_geosparql_timeout_risk(query: str) -> list[str]:
     """Detecteer GeoSPARQL-relaties die structureel timeout veroorzaken op Virtuoso."""
     matches = GEOSPARQL_RELATIONS.findall(query)
@@ -150,6 +231,9 @@ def validate_sparql(query: str) -> dict:
     warnings.extend(_find_unsafe_label_filters(q))
     warnings.extend(_find_groupby_overflow_risk(q))
     warnings.extend(_find_geosparql_timeout_risk(q))
+    warnings.extend(_find_order_by_optional_timeout_risk(q))
+    warnings.extend(_find_cartesian_product_risk(q))
+    warnings.extend(_find_untyped_numeric_literal_risk(q))
 
     select_pos = q_upper.find("SELECT")
     from_pos = q_upper.find("FROM")

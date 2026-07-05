@@ -7,16 +7,24 @@ from rce_cho_mcp.config import SPARQL_ENDPOINT, USER_AGENT
 
 
 def execute_sparql(query: str, timeout: int = 30) -> dict:
-    """Execute a SPARQL query and return the JSON response."""
-    params = urllib.parse.urlencode({"query": query})
-    url = f"{SPARQL_ENDPOINT}?{params}"
+    """Execute a SPARQL query and return the JSON response.
+
+    Uses POST, not GET: a query with a large VALUES clause (>~300-500 URIs,
+    querystring >~30-40KB) causes GET to fail with HTTP 431 "Request Header
+    Fields Too Large". POST has been tested with querystrings up to ~255KB /
+    ~3000 URIs without issues.
+    """
+    data = urllib.parse.urlencode({"query": query}).encode("utf-8")
 
     request = urllib.request.Request(
-        url,
+        SPARQL_ENDPOINT,
+        data=data,
         headers={
             "Accept": "application/sparql-results+json",
+            "Content-Type": "application/x-www-form-urlencoded",
             "User-Agent": USER_AGENT,
         },
+        method="POST",
     )
 
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -33,11 +41,16 @@ def classify_error(body: str, http_code: int) -> tuple[str, str]:
             "Herschrijf de query met een subquery op twee niveaus: haal eerst de "
             "URI's op in een subquery, join daarna de lange tekstvelden buiten de GROUP BY.",
         )
-    if "timeout" in b or "rdfr20" in b:
+    if http_code == 504 or "timeout" in b or "time-out" in b or "rdfr20" in b:
         return (
             "TIMEOUT",
-            "Het endpoint heeft de query afgebroken wegens een tijdslimiet. "
-            "Voeg een LIMIT toe, verklein het bereik, of splits de query op.",
+            "Het endpoint heeft de query afgebroken wegens een tijdslimiet "
+            f"(HTTP {http_code}; een 504 van de gateway bevat vaak geen 'timeout' "
+            "in de body). Voeg een LIMIT toe, verklein het bereik, of splits de query op. "
+            "Combineert de query ORDER BY met OPTIONAL-joins? Gebruik dan een "
+            "tweetraps-subquery: sorteer/pagineer eerst goedkoop op een enkele variabele "
+            "in een binnenste SELECT DISTINCT, en voeg de duurdere OPTIONAL-joins pas toe "
+            "in de buitenste query op de al-beperkte set. Zie validate_query_structured().",
         )
     if "sparql compiler" in b or "sp029" in b or "syntax" in b:
         return (
