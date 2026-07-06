@@ -128,6 +128,37 @@ SEMANTIC_TOPICS = {
             },
         ],
     },
+    "identifiers": {
+        "title": "Identificerende nummers (huisnummer, perceelnummer)",
+        "description": (
+            "Gebruik dit topic voordat je filtert op huisnummer of "
+            "perceelnummer: deze velden zijn ongetypeerde string-literals, "
+            "geen xsd:integer."
+        ),
+        "patterns": [
+            {
+                "name": "Huisnummer",
+                "path": ["ceo:huisnummer"],
+                "guidance": (
+                    "ceo:huisnummer is een ongetypeerd string-literal (bv. \"19\"), "
+                    "geen xsd:integer. Filter of match altijd met aanhalingstekens: "
+                    "ceo:huisnummer \"19\". Een kaal getal (ceo:huisnummer 19) matcht "
+                    "de RDF-term niet en geeft stil 0 resultaten, zonder foutmelding -- "
+                    "ook als het monument gegarandeerd bestaat. validate_query_structured() "
+                    "waarschuwt hiervoor."
+                ),
+            },
+            {
+                "name": "Perceelnummer",
+                "path": ["ceo:heeftKadastraleAanduiding", "ceo:perceelnummer"],
+                "guidance": (
+                    "ceo:perceelnummer is, net als huisnummer, een ongetypeerd "
+                    "string-literal. Vergelijk altijd met een gequote waarde "
+                    "(ceo:perceelnummer \"123\"), nooit met een kaal getal."
+                ),
+            },
+        ],
+    },
     "geometry": {
         "title": "Geometrie",
         "description": (

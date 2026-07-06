@@ -81,4 +81,20 @@ Ontwerpregels:
 - Zet FROM nooit vóór SELECT.
 - Gebruik bij tellingen meestal COUNT(DISTINCT ?var) met een alias.
 - Gebruik ceosp: en ceox: niet als shortcuts voor onbekende paden.
+- ceo:huisnummer en ceo:perceelnummer zijn ongetypeerde string-literals, geen
+  xsd:integer. Gebruik altijd aanhalingstekens (ceo:huisnummer "19"), nooit
+  een kaal getal (ceo:huisnummer 19) -- dat matcht stil niets.
+- Combineer ORDER BY nooit met OPTIONAL-joins in dezelfde query: dit
+  veroorzaakt op dit endpoint consistent een HTTP 504, ook met een kleine
+  LIMIT. Sorteer/pagineer eerst goedkoop in een binnenste SELECT DISTINCT op
+  een enkele variabele, voeg de OPTIONAL-joins pas toe in de buitenste query.
+- Gebruik nooit meerdere onafhankelijke multi-valued OPTIONAL-blokken in
+  dezelfde query (bv. meerdere BRK-percelen EN meerdere BAG-adressen): dit
+  geeft een cartesisch product (aantal_a x aantal_b rijen i.p.v. aantal_a +
+  aantal_b losse feiten). Haal deze relaties op in aparte queries en combineer
+  in code.
+- De brondata kan dezelfde triple meerdere keren bevatten (bevestigd: 116x
+  dezelfde BRK-relatie op één monument). Dedupliceer verzamel-resultaten
+  (tellingen, lijsten) altijd met DISTINCT of in code, anders vertekent dit
+  het resultaat.
 """
