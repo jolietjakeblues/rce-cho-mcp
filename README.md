@@ -8,7 +8,7 @@ The goal is not only SPARQL execution, but reliable interaction with Dutch cultu
 
 ## Status
 
-Experimental.
+Beta (v0.2.0-beta).
 
 Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
 

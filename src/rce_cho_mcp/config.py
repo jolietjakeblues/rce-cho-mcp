@@ -59,4 +59,4 @@ for _row in KNOWN_GRAPH_ROWS:
 
 del _row
 
-USER_AGENT = "rce-cho-mcp/0.2.0"
+USER_AGENT = "rce-cho-mcp/0.2.0b1"

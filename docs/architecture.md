@@ -2,7 +2,7 @@
 
 ## RCE CHO MCP
 
-Version: 0.1 (Draft)
+Version: 0.2.0-beta
 
 ---
 
