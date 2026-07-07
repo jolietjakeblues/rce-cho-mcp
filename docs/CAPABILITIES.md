@@ -254,6 +254,17 @@ een query met een grote `VALUES`-clause (>~300-500 URI's, querystring
 >~30-40KB) laat GET falen met HTTP 431 "Request Header Fields Too Large".
 POST is getest tot ~255KB / ~3000 URI's zonder problemen.
 
+### Endpoints: default en fallback
+
+Queries gaan standaard naar het "Speedy"-endpoint (standaardconforme
+SPARQL 1.1). Is dat endpoint onbereikbaar of geeft het een gateway-fout
+(502/503/504), dan probeert `execute_sparql()` automatisch één keer opnieuw
+via het "Virtuoso"-endpoint — dat wel GeoSPARQL ondersteunt, maar de hierboven
+genoemde eigenaardigheden heeft (GROUP BY-overflow, ORDER BY+OPTIONAL 504's,
+geof:sfWithin-timeouts). Een queryfout (bv. een syntaxfout, 4xx) triggert geen
+fallback, omdat dezelfde query daar identiek zou falen. Overschrijfbaar via de
+omgevingsvariabelen `SPARQL_ENDPOINT` en `SPARQL_FALLBACK_ENDPOINT`.
+
 ## Bekende performance- en datakwaliteitskenmerken
 
 - **Query-resultaat-caching**: het endpoint lijkt te cachen op exacte

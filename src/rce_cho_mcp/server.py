@@ -11,7 +11,7 @@ from rce_cho_mcp.ontology.api import (
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.resolver import describe_resource, resolve_label
 from rce_cho_mcp.semantics import format_topic, format_topics
-from rce_cho_mcp.sparql import SPARQL_ENDPOINT, classify_error, execute_sparql, format_results, rd_to_wgs84, to_geojson
+from rce_cho_mcp.sparql import classify_error, execute_sparql, format_results, rd_to_wgs84, to_geojson
 from rce_cho_mcp.graphs import format_graphs
 from rce_cho_mcp.validator import format_validation_report, validate_sparql
 
@@ -142,7 +142,7 @@ def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
         body = e.read().decode("utf-8", errors="replace")
         code, advies = classify_error(body, e.code)
         return (
-            f"[{code}] HTTP {e.code} van {SPARQL_ENDPOINT}\n\n"
+            f"[{code}] HTTP {e.code} van {e.url}\n\n"
             f"Advies: {advies}\n\n"
             f"Ruwe foutmelding:\n{body[:500]}"
         )
@@ -163,7 +163,7 @@ def query_sparql_json(sparql_query: str) -> dict:
             "error": code,
             "status": e.code,
             "advies": advies,
-            "endpoint": SPARQL_ENDPOINT,
+            "endpoint": e.url,
             "body": body[:500],
         }
 
@@ -202,7 +202,7 @@ def query_sparql_geojson(
             "error": code,
             "status": e.code,
             "advies": advies,
-            "endpoint": SPARQL_ENDPOINT,
+            "endpoint": e.url,
             "body": body[:500],
         }
     except Exception as e:

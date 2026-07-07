@@ -1,23 +1,19 @@
 import json
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 
-from rce_cho_mcp.config import SPARQL_ENDPOINT, USER_AGENT
+from rce_cho_mcp.config import SPARQL_ENDPOINT, SPARQL_FALLBACK_ENDPOINT, USER_AGENT
+
+# Gateway-level codes that mean "this endpoint instance is having trouble",
+# as opposed to a 4xx that reflects a problem with the query itself.
+_FALLBACK_HTTP_CODES = {502, 503, 504}
 
 
-def execute_sparql(query: str, timeout: int = 30) -> dict:
-    """Execute a SPARQL query and return the JSON response.
-
-    Uses POST, not GET: a query with a large VALUES clause (>~300-500 URIs,
-    querystring >~30-40KB) causes GET to fail with HTTP 431 "Request Header
-    Fields Too Large". POST has been tested with querystrings up to ~255KB /
-    ~3000 URIs without issues.
-    """
-    data = urllib.parse.urlencode({"query": query}).encode("utf-8")
-
+def _post_sparql(endpoint: str, data: bytes, timeout: int) -> dict:
     request = urllib.request.Request(
-        SPARQL_ENDPOINT,
+        endpoint,
         data=data,
         headers={
             "Accept": "application/sparql-results+json",
@@ -30,7 +26,43 @@ def execute_sparql(query: str, timeout: int = 30) -> dict:
     with urllib.request.urlopen(request, timeout=timeout) as response:
         raw = response.read().decode("utf-8")
         return json.loads(raw)
-    
+
+
+def execute_sparql(query: str, timeout: int = 30) -> dict:
+    """Execute a SPARQL query and return the JSON response.
+
+    Uses POST, not GET: a query with a large VALUES clause (>~300-500 URIs,
+    querystring >~30-40KB) causes GET to fail with HTTP 431 "Request Header
+    Fields Too Large". POST has been tested with querystrings up to ~255KB /
+    ~3000 URIs without issues.
+
+    Tries SPARQL_ENDPOINT ("Speedy") first. If that endpoint cannot be
+    reached at all, or answers with a gateway-level error (502/503/504),
+    the query is retried once against SPARQL_FALLBACK_ENDPOINT ("Virtuoso").
+    A query-level error (e.g. a 4xx syntax error) is not retried on the
+    fallback, since the same query would fail there identically.
+    """
+    data = urllib.parse.urlencode({"query": query}).encode("utf-8")
+
+    endpoints = [SPARQL_ENDPOINT]
+    if SPARQL_FALLBACK_ENDPOINT and SPARQL_FALLBACK_ENDPOINT != SPARQL_ENDPOINT:
+        endpoints.append(SPARQL_FALLBACK_ENDPOINT)
+
+    for index, endpoint in enumerate(endpoints):
+        is_last_attempt = index == len(endpoints) - 1
+
+        try:
+            return _post_sparql(endpoint, data, timeout)
+        except urllib.error.HTTPError as e:
+            if not is_last_attempt and e.code in _FALLBACK_HTTP_CODES:
+                continue
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if not is_last_attempt:
+                continue
+            raise
+
+
 def classify_error(body: str, http_code: int) -> tuple[str, str]:
     """Classificeer een bekende Virtuoso- of endpointfout."""
     b = body.lower()

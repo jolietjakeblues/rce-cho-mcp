@@ -144,6 +144,10 @@ Relevant triples may be spread across multiple named graphs.
 `query_sparql_geojson` converts SELECT results with a WKT geometry variable into a GeoJSON FeatureCollection.  
 `convert_rd_to_wgs84` converts a single RD New (EPSG:28992) coordinate pair to WGS84.
 
+#### Endpoints
+
+By default, queries go to the "Speedy" endpoint (standards-compliant SPARQL 1.1). If that endpoint is unreachable or returns a gateway-level error (502/503/504), `execute_sparql()` automatically retries once against the "Virtuoso" endpoint, which supports GeoSPARQL but has the query quirks listed above. Override with the `SPARQL_ENDPOINT` and `SPARQL_FALLBACK_ENDPOINT` environment variables.
+
 ## Why dataset semantics?
 
 The RCE linked data environment contains more than ontology definitions.

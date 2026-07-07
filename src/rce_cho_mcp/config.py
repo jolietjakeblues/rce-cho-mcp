@@ -3,18 +3,29 @@ import os
 from rce_cho_mcp.graphs import KNOWN_GRAPH_ROWS
 
 
+# "Virtuoso" endpoint: supports GeoSPARQL, but has the query quirks documented
+# in semantics.py/validator.py (GROUP BY overflow on long text fields,
+# ORDER BY + OPTIONAL 504s, geof:sfWithin timeouts).
 CHO_SERVICE_ENDPOINT = os.getenv(
     "CHO_SERVICE_ENDPOINT",
     "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql",
 )
 
+# "Speedy" endpoint: standards-compliant SPARQL 1.1.
 CHO_DATASET_ENDPOINT = os.getenv(
     "CHO_DATASET_ENDPOINT",
     "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/sparql",
 )
 
+# Speedy is the default; Virtuoso is used as a fallback by execute_sparql()
+# when Speedy is unreachable or returns a gateway-level error (502/503/504).
 SPARQL_ENDPOINT = os.getenv(
     "SPARQL_ENDPOINT",
+    CHO_DATASET_ENDPOINT,
+)
+
+SPARQL_FALLBACK_ENDPOINT = os.getenv(
+    "SPARQL_FALLBACK_ENDPOINT",
     CHO_SERVICE_ENDPOINT,
 )
 
