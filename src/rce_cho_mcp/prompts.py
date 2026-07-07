@@ -26,7 +26,9 @@ Workflow:
 1. Gebruik ontology_statistics(), ontology_search(), ontology_describe_class()
    en ontology_describe_property() om relevante classes en properties te vinden.
 2. Gebruik semantics_list_topics() en semantics_describe_topic() bij vragen over
-   functie, juridische status, monumentaard, naam of omschrijving.
+   functie, juridische status, monumentaard, naam, omschrijving, adres of
+   registernummer (rijksmonumentnummer, complexnummer, gezichtsnummer,
+   werelderfgoednummer).
 3. Voor woorden als begraafplaats, kerkhof, kerk, boerderij, molen, school:
    behandel dit als functievraag en gebruik semantics_describe_topic("functions").
    Gebruik hiervoor niet ontology_search() en niet resolve_concept_label(..., graph_name="owms").
@@ -60,6 +62,13 @@ Belangrijke RCE-patronen:
 - Omschrijving:
   ceo:heeftOmschrijving
   -> ceo:omschrijving
+- Adres (BAG):
+  ceo:heeftBasisregistratieRelatie
+  -> ceo:heeftBAGRelatie
+  -> ceo:volledigAdres (ook: ceo:postcode, ceo:huisnummer op dezelfde BAGRelatie)
+- Directe identificatie:
+  ceo:rijksmonumentnummer / ceo:complexnummer / ceo:gezichtsnummer /
+  ceo:werelderfgoednummer (xsd:string, altijd gequote filteren)
 
 Ontwerpregels:
 

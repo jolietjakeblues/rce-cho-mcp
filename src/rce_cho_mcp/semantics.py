@@ -129,13 +129,52 @@ SEMANTIC_TOPICS = {
         ],
     },
     "identifiers": {
-        "title": "Identificerende nummers (huisnummer, perceelnummer)",
+        "title": "Identificerende nummers (registernummers, huisnummer, perceelnummer)",
         "description": (
-            "Gebruik dit topic voordat je filtert op huisnummer of "
-            "perceelnummer: deze velden zijn ongetypeerde string-literals, "
-            "geen xsd:integer."
+            "Gebruik dit topic voordat je filtert op een registernummer, huisnummer "
+            "of perceelnummer: deze velden zijn stuk voor stuk xsd:string, geen "
+            "xsd:integer, ook wanneer de waarde er als getal uitziet."
         ),
         "patterns": [
+            {
+                "name": "Rijksmonumentnummer",
+                "path": ["ceo:rijksmonumentnummer"],
+                "guidance": (
+                    "ceo:rijksmonumentnummer (rdfs:domain ceo:Rijksmonument) is het "
+                    "unieke nummer waaronder een rijksmonument bekend staat in het "
+                    "monumentenregister (skos:example \"2\"). Het is xsd:string: filter "
+                    "altijd met aanhalingstekens (ceo:rijksmonumentnummer \"2\"), nooit "
+                    "met een kaal getal. Dit is de meest directe sleutel om een specifiek "
+                    "rijksmonument op te zoeken -- gebruik dit pad voor 'zoek monument "
+                    "nummer X' in plaats van te filteren op naam of omschrijving."
+                ),
+            },
+            {
+                "name": "Complexnummer",
+                "path": ["ceo:complexnummer"],
+                "guidance": (
+                    "ceo:complexnummer identificeert het complex waaronder een groep "
+                    "rijksmonumenten in het monumentenregister bekend staat. Ook hier: "
+                    "xsd:string, altijd gequote filteren."
+                ),
+            },
+            {
+                "name": "Gezichtsnummer",
+                "path": ["ceo:gezichtsnummer"],
+                "guidance": (
+                    "ceo:gezichtsnummer identificeert een beschermd stads- of "
+                    "dorpsgezicht (ceo:Gezicht). xsd:string, altijd gequote filteren."
+                ),
+            },
+            {
+                "name": "Werelderfgoednummer",
+                "path": ["ceo:werelderfgoednummer"],
+                "guidance": (
+                    "ceo:werelderfgoednummer (rdfs:domain ceo:Werelderfgoed) identificeert "
+                    "een werelderfgoed (skos:example \"759\"). xsd:string, altijd gequote "
+                    "filteren."
+                ),
+            },
             {
                 "name": "Huisnummer",
                 "path": ["ceo:huisnummer"],
@@ -155,6 +194,39 @@ SEMANTIC_TOPICS = {
                     "ceo:perceelnummer is, net als huisnummer, een ongetypeerd "
                     "string-literal. Vergelijk altijd met een gequote waarde "
                     "(ceo:perceelnummer \"123\"), nooit met een kaal getal."
+                ),
+            },
+        ],
+    },
+    "addresses": {
+        "title": "Adressen (BAG)",
+        "description": (
+            "Gebruik dit topic voor vragen over het adres van een cultuurhistorisch "
+            "object (straat, huisnummer, postcode). Adresgegevens staan niet direct "
+            "op het object, maar op de gekoppelde BAG-relatie."
+        ),
+        "patterns": [
+            {
+                "name": "Volledig adres via BAG",
+                "path": [
+                    "ceo:heeftBasisregistratieRelatie",
+                    "ceo:heeftBAGRelatie",
+                    "ceo:volledigAdres",
+                ],
+                "guidance": (
+                    "Kernpatroon: CultuurhistorischObject "
+                    "-> ceo:heeftBasisregistratieRelatie -> ceo:BasisregistratieRelatie "
+                    "-> ceo:heeftBAGRelatie -> ceo:BAGRelatie -> ceo:volledigAdres "
+                    "(skos:example \"Eerste Bloemdwarsstraat 10\"). Postcode "
+                    "(ceo:postcode, bv. \"1012BS\") en huisnummer (ceo:huisnummer) staan "
+                    "op dezelfde ceo:BAGRelatie-node. Een object kan meerdere "
+                    "BAGRelaties hebben (bv. een boerderijcomplex met meerdere "
+                    "verblijfsobjecten); gebruik COUNT(DISTINCT ...) en DISTINCT in "
+                    "SELECT-resultaten om dubbeltellingen te voorkomen. Combineer deze "
+                    "OPTIONAL-tak niet in dezelfde query met een andere multi-valued "
+                    "OPTIONAL-tak zoals BRK-percelen (ceo:heeftBRKRelatie) -- dat geeft "
+                    "een cartesisch product. Haal BAG- en BRK-gegevens in aparte "
+                    "queries op en combineer ze in code."
                 ),
             },
         ],
@@ -183,7 +255,7 @@ SEMANTIC_TOPICS = {
                     "joins — deze veroorzaken structurele timeouts op het Virtuoso-endpoint. "
                     "Haal in plaats daarvan de WKT-geometrieën op via query_sparql() en voer "
                     "de ruimtelijke join daarna lokaal uit met Shapely in Python. "
-                    "Let op: de graph 'linies' gebruikt ceo:asWKT-RD met Rijksdriehoekscoördinaten "
+                    "Let op: de graph 'linies' gebruikt ceo:asWKT-RD met Rijksdriehoekscoordinaten "
                     "(EPSG:28992), niet WGS84. query_sparql_geojson() slaat die rijen automatisch "
                     "over (zichtbaar als '_skipped' in het resultaat). Gebruik voor linies een "
                     "aparte conversie van RD naar WGS84 vóór visualisatie."

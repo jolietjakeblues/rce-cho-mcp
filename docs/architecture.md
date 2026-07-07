@@ -138,24 +138,35 @@ src/
 
         server.py
 
-        tools.py
+        config.py
 
-        planner.py
+        graphs.py
 
-        ontology.py
+        resolver.py
 
-        validator.py
+        semantics.py
 
         sparql.py
 
-        formatter.py
+        validator.py
 
         prompts.py
 
-        examples.py
+        ontology/
 
-        config.py
+            loader.py
+
+            registry.py
+
+            api.py
+
+            CEO_RCE.ttl
 ```
+
+Note: this reflects the actual module layout. Earlier drafts of this
+document described a planned `tools.py` / `planner.py` / `ontology.py` /
+`formatter.py` / `examples.py` split that was never built this way; the
+responsibilities described below map onto the modules listed above.
 
 ---
 

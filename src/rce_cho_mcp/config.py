@@ -1,5 +1,7 @@
 import os
 
+from rce_cho_mcp.graphs import KNOWN_GRAPH_ROWS
+
 
 CHO_SERVICE_ENDPOINT = os.getenv(
     "CHO_SERVICE_ENDPOINT",
@@ -21,13 +23,29 @@ DEFAULT_DATASET_GRAPH = os.getenv(
     "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
 )
 
+# Graphs that graphs_list() lists for discovery but that are not queryable
+# named graphs on the RCE CHO SPARQL endpoint itself: "ceo-ontology" is a raw
+# ontology file on GitHub and "triply-owms" lives on a separate external
+# TriplyDB service. A GRAPH <...> clause against either silently returns zero
+# results rather than an error, so they are excluded from the graph_name
+# allowlist below.
+_NON_QUERYABLE_GRAPH_KEYS = {"ceo-ontology", "triply-owms"}
+
+# Short, stable aliases kept for backward compatibility with existing callers.
 KNOWN_GRAPHS = {
     "owms": "https://linkeddata.cultureelerfgoed.nl/graph/owms",
     "instanties-rce": "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
     "abr": "https://data.cultureelerfgoed.nl/term/id/abr/thesaurus",
     "cht": "https://data.cultureelerfgoed.nl/term/id/cht/thesaurus",
     "bebouwdeomgeving": "https://linkeddata.cultureelerfgoed.nl/graph/bebouwdeomgeving",
-    "ceo": "https://raw.githubusercontent.com/cultureelerfgoed/CEO/master/CEO_RCE.ttl",
 }
+
+# Fill in every other graph known to graphs_list() so a graph_name a client
+# just discovered there is guaranteed to also work in resolve_concept_label().
+for _row in KNOWN_GRAPH_ROWS:
+    if _row["key"] not in KNOWN_GRAPHS and _row["key"] not in _NON_QUERYABLE_GRAPH_KEYS:
+        KNOWN_GRAPHS[_row["key"]] = _row["uri"]
+
+del _row
 
 USER_AGENT = "rce-cho-mcp/0.2.0"

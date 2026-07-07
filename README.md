@@ -100,6 +100,7 @@ Relevant triples may be spread across multiple named graphs.
 ### Discovery
 
 * `ping`
+* `graphs_list`
 * `ontology_statistics`
 * `ontology_search`
 
@@ -135,9 +136,13 @@ Relevant triples may be spread across multiple named graphs.
 
 * `query_sparql`
 * `query_sparql_json`
+* `query_sparql_geojson`
+* `convert_rd_to_wgs84`
 
 `query_sparql` returns readable text with classified error codes on failure.  
-`query_sparql_json` returns raw SPARQL JSON for agents, tables, benchmarks and follow-up processing.
+`query_sparql_json` returns raw SPARQL JSON for agents, tables, benchmarks and follow-up processing.  
+`query_sparql_geojson` converts SELECT results with a WKT geometry variable into a GeoJSON FeatureCollection.  
+`convert_rd_to_wgs84` converts a single RD New (EPSG:28992) coordinate pair to WGS84.
 
 ## Why dataset semantics?
 

@@ -100,6 +100,7 @@ Huidige topics:
 - `names`
 - `descriptions`
 - `identifiers`
+- `addresses`
 - `geometry`
 
 Belangrijke patronen:
@@ -195,6 +196,9 @@ Controleert SPARQL-query's op bekende valkuilen.
 
 Huidige tools:
 
+- `validate_query`
+- `validate_query_structured`
+
 Voorbeelden van controles:
 - verdachte prefixes
 - onjuiste `SELECT/FROM/WHERE` volgorde
@@ -214,10 +218,15 @@ Voert SPARQL-query's uit op het RCE CHO endpoint.
 
 Huidige tools:
 
+- `query_sparql`
+- `query_sparql_json`
+- `query_sparql_geojson`
+- `convert_rd_to_wgs84`
+
 `query_sparql` geeft leesbare tekst terug.
 `query_sparql_json` geeft het ruwe SPARQL JSON-resultaat terug voor agents en vervolgverwerking.
-
-- `query_sparql`
+`query_sparql_geojson` zet SELECT-resultaten met een WKT-geometrievariabele om naar een GeoJSON FeatureCollection.
+`convert_rd_to_wgs84` zet een los RD New (EPSG:28992) coördinatenpaar om naar WGS84.
 
 Voorbeeld:
 
