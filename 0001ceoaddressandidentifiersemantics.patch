@@ -1,0 +1,151 @@
+From 0fe53d8e86963b80fc687ec27fa9bc89b99dc3fc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 7 Jul 2026 08:18:22 +0000
+Subject: [PATCH] Add BAG address pattern and registration-number identifiers
+ to dataset semantics
+
+The CEO ontology defines ceo:rijksmonumentnummer, ceo:complexnummer,
+ceo:gezichtsnummer and ceo:werelderfgoednummer as the primary lookup keys
+for their respective object types, and the BAG address path
+(heeftBasisregistratieRelatie -> heeftBAGRelatie -> volledigAdres) as the
+only route to an object's address. Neither was covered by
+semantics_describe_topic() yet, so clients had no guidance on the quoted
+xsd:string filtering pitfall for these fields or on the address join path.
+---
+ src/rce_cho_mcp/prompts.py   | 11 ++++-
+ src/rce_cho_mcp/semantics.py | 80 ++++++++++++++++++++++++++++++++++--
+ 2 files changed, 86 insertions(+), 5 deletions(-)
+
+diff --git a/src/rce_cho_mcp/prompts.py b/src/rce_cho_mcp/prompts.py
+index 874d0ca..ac8acc8 100644
+--- a/src/rce_cho_mcp/prompts.py
++++ b/src/rce_cho_mcp/prompts.py
+@@ -26,7 +26,9 @@ Workflow:
+ 1. Gebruik ontology_statistics(), ontology_search(), ontology_describe_class()
+    en ontology_describe_property() om relevante classes en properties te vinden.
+ 2. Gebruik semantics_list_topics() en semantics_describe_topic() bij vragen over
+-   functie, juridische status, monumentaard, naam of omschrijving.
++   functie, juridische status, monumentaard, naam, omschrijving, adres of
++   registernummer (rijksmonumentnummer, complexnummer, gezichtsnummer,
++   werelderfgoednummer).
+ 3. Voor woorden als begraafplaats, kerkhof, kerk, boerderij, molen, school:
+    behandel dit als functievraag en gebruik semantics_describe_topic("functions").
+    Gebruik hiervoor niet ontology_search() en niet resolve_concept_label(..., graph_name="owms").
+@@ -60,6 +62,13 @@ Belangrijke RCE-patronen:
+ - Omschrijving:
+   ceo:heeftOmschrijving
+   -> ceo:omschrijving
++- Adres (BAG):
++  ceo:heeftBasisregistratieRelatie
++  -> ceo:heeftBAGRelatie
++  -> ceo:volledigAdres (ook: ceo:postcode, ceo:huisnummer op dezelfde BAGRelatie)
++- Directe identificatie:
++  ceo:rijksmonumentnummer / ceo:complexnummer / ceo:gezichtsnummer /
++  ceo:werelderfgoednummer (xsd:string, altijd gequote filteren)
+ 
+ Ontwerpregels:
+ 
+diff --git a/src/rce_cho_mcp/semantics.py b/src/rce_cho_mcp/semantics.py
+index 54752ff..4a29c9e 100644
+--- a/src/rce_cho_mcp/semantics.py
++++ b/src/rce_cho_mcp/semantics.py
+@@ -129,13 +129,52 @@ SEMANTIC_TOPICS = {
+         ],
+     },
+     "identifiers": {
+-        "title": "Identificerende nummers (huisnummer, perceelnummer)",
++        "title": "Identificerende nummers (registernummers, huisnummer, perceelnummer)",
+         "description": (
+-            "Gebruik dit topic voordat je filtert op huisnummer of "
+-            "perceelnummer: deze velden zijn ongetypeerde string-literals, "
+-            "geen xsd:integer."
++            "Gebruik dit topic voordat je filtert op een registernummer, huisnummer "
++            "of perceelnummer: deze velden zijn stuk voor stuk xsd:string, geen "
++            "xsd:integer, ook wanneer de waarde er als getal uitziet."
+         ),
+         "patterns": [
++            {
++                "name": "Rijksmonumentnummer",
++                "path": ["ceo:rijksmonumentnummer"],
++                "guidance": (
++                    "ceo:rijksmonumentnummer (rdfs:domain ceo:Rijksmonument) is het "
++                    "unieke nummer waaronder een rijksmonument bekend staat in het "
++                    "monumentenregister (skos:example \"2\"). Het is xsd:string: filter "
++                    "altijd met aanhalingstekens (ceo:rijksmonumentnummer \"2\"), nooit "
++                    "met een kaal getal. Dit is de meest directe sleutel om een specifiek "
++                    "rijksmonument op te zoeken -- gebruik dit pad voor 'zoek monument "
++                    "nummer X' in plaats van te filteren op naam of omschrijving."
++                ),
++            },
++            {
++                "name": "Complexnummer",
++                "path": ["ceo:complexnummer"],
++                "guidance": (
++                    "ceo:complexnummer identificeert het complex waaronder een groep "
++                    "rijksmonumenten in het monumentenregister bekend staat. Ook hier: "
++                    "xsd:string, altijd gequote filteren."
++                ),
++            },
++            {
++                "name": "Gezichtsnummer",
++                "path": ["ceo:gezichtsnummer"],
++                "guidance": (
++                    "ceo:gezichtsnummer identificeert een beschermd stads- of "
++                    "dorpsgezicht (ceo:Gezicht). xsd:string, altijd gequote filteren."
++                ),
++            },
++            {
++                "name": "Werelderfgoednummer",
++                "path": ["ceo:werelderfgoednummer"],
++                "guidance": (
++                    "ceo:werelderfgoednummer (rdfs:domain ceo:Werelderfgoed) identificeert "
++                    "een werelderfgoed (skos:example \"759\"). xsd:string, altijd gequote "
++                    "filteren."
++                ),
++            },
+             {
+                 "name": "Huisnummer",
+                 "path": ["ceo:huisnummer"],
+@@ -159,6 +198,39 @@ SEMANTIC_TOPICS = {
+             },
+         ],
+     },
++    "addresses": {
++        "title": "Adressen (BAG)",
++        "description": (
++            "Gebruik dit topic voor vragen over het adres van een cultuurhistorisch "
++            "object (straat, huisnummer, postcode). Adresgegevens staan niet direct "
++            "op het object, maar op de gekoppelde BAG-relatie."
++        ),
++        "patterns": [
++            {
++                "name": "Volledig adres via BAG",
++                "path": [
++                    "ceo:heeftBasisregistratieRelatie",
++                    "ceo:heeftBAGRelatie",
++                    "ceo:volledigAdres",
++                ],
++                "guidance": (
++                    "Kernpatroon: CultuurhistorischObject "
++                    "-> ceo:heeftBasisregistratieRelatie -> ceo:BasisregistratieRelatie "
++                    "-> ceo:heeftBAGRelatie -> ceo:BAGRelatie -> ceo:volledigAdres "
++                    "(skos:example \"Eerste Bloemdwarsstraat 10\"). Postcode "
++                    "(ceo:postcode, bv. \"1012BS\") en huisnummer (ceo:huisnummer) staan "
++                    "op dezelfde ceo:BAGRelatie-node. Een object kan meerdere "
++                    "BAGRelaties hebben (bv. een boerderijcomplex met meerdere "
++                    "verblijfsobjecten); gebruik COUNT(DISTINCT ...) en DISTINCT in "
++                    "SELECT-resultaten om dubbeltellingen te voorkomen. Combineer deze "
++                    "OPTIONAL-tak niet in dezelfde query met een andere multi-valued "
++                    "OPTIONAL-tak zoals BRK-percelen (ceo:heeftBRKRelatie) -- dat geeft "
++                    "een cartesisch product. Haal BAG- en BRK-gegevens in aparte "
++                    "queries op en combineer ze in code."
++                ),
++            },
++        ],
++    },
+     "geometry": {
+         "title": "Geometrie",
+         "description": (
+-- 
+2.43.0
+
