@@ -78,6 +78,6 @@ git push
 
 ## Current status
 
-The project is currently in alpha stage.
+The project is currently in beta stage (v0.2.0-beta).
 
-The API, tool names and capabilities may change between releases.
+The API, tool names and capabilities may still change between releases.

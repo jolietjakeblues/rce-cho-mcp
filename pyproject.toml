@@ -1,6 +1,6 @@
 [project]
 name = "rce-cho-mcp"
-version = "0.1.0"
+version = "0.2.0b1"
 description = "MCP server for querying the Dutch RCE Cultural Heritage Objects linked data endpoint"
 readme = "README.md"
 requires-python = ">=3.11"
