@@ -109,6 +109,16 @@ Relevant triples may be spread across multiple named graphs.
 * `ontology_describe_class`
 * `ontology_describe_property`
 
+### Live dataset statistics
+
+* `dataset_statistics`
+* `class_instance_counts`
+* `property_usage_counts`
+* `explore_class`
+* `explore_incoming`
+
+Unlike the ontology tools above (which describe what is *defined* in the bundled CEO ontology), these tools query the live endpoint for what is *actually present* in the data: instance counts per class/property (including ontology classes with zero instances), and empirical forward/backward path discovery based on a sample of real instances.
+
 ### Dataset semantics
 
 * `semantics_list_topics`

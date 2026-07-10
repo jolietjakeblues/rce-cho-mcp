@@ -25,6 +25,11 @@ Workflow:
 
 1. Gebruik ontology_statistics(), ontology_search(), ontology_describe_class()
    en ontology_describe_property() om relevante classes en properties te vinden.
+   Twijfel je of een pad uit de ontologie ook echt in de data voorkomt, of mist
+   de ontologie een pad? Gebruik dan explore_class() (uitgaand) of
+   explore_incoming() (inkomend) voor een empirische steekproef op de live data,
+   en class_instance_counts() / property_usage_counts() om te zien of een klasse
+   of property daadwerkelijk gevuld is.
 2. Gebruik semantics_list_topics() en semantics_describe_topic() bij vragen over
    functie, juridische status, monumentaard, naam, omschrijving, adres of
    registernummer (rijksmonumentnummer, complexnummer, gezichtsnummer,

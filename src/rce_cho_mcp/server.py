@@ -14,6 +14,18 @@ from rce_cho_mcp.semantics import format_topic, format_topics
 from rce_cho_mcp.sparql import classify_error, execute_sparql, format_results, rd_to_wgs84, to_geojson
 from rce_cho_mcp.graphs import format_graphs
 from rce_cho_mcp.validator import format_validation_report, validate_sparql
+from rce_cho_mcp.stats import (
+    class_partitions,
+    dataset_totals,
+    explore_class_paths,
+    explore_incoming_paths,
+    format_class_partitions,
+    format_class_paths,
+    format_incoming_paths,
+    format_property_partitions,
+    format_totals,
+    property_partitions,
+)
 
 
 mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
@@ -38,6 +50,114 @@ def ontology_statistics() -> str:
         f"Classes: {stats['classes']}\n"
         f"Properties: {stats['properties']}"
     )
+
+@mcp.tool()
+def dataset_statistics() -> str:
+    """Geef live datasettotalen: triples, entiteiten, klassen en properties.
+
+    In tegenstelling tot ontology_statistics() (telt wat er in het gebundelde
+    ontologiebestand is gedefinieerd) telt dit wat er daadwerkelijk in de
+    live data staat.
+    """
+    try:
+        return format_totals(dataset_totals())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+    except Exception as e:
+        return f"Onverwachte fout: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+def class_instance_counts(only_ceo: bool = True, limit: int = 100) -> str:
+    """Telt per klasse het aantal instanties in de live dataset.
+
+    Toont ook welke ontologieklassen NIET in de data voorkomen: klassen die
+    in ontology_describe_class() bestaan maar hier ontbreken hebben nul
+    instanties in de praktijk.
+
+    only_ceo: beperk tot klassen in de CEO-namespace (standaard True).
+    limit: maximum aantal getoonde klassen (1-1000).
+    """
+    try:
+        return format_class_partitions(class_partitions(only_ceo=only_ceo, limit=limit))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+    except Exception as e:
+        return f"Onverwachte fout: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+def property_usage_counts(only_ceo: bool = True, limit: int = 100) -> str:
+    """Telt per property het aantal triples in de live dataset.
+
+    Properties met lage aantallen zijn dun gevuld -- relevant om in te
+    schatten of een querypad kansrijk is voordat je 'm schrijft.
+
+    only_ceo: beperk tot properties in de CEO-namespace (standaard True).
+    limit: maximum aantal getoonde properties (1-1000).
+    """
+    try:
+        return format_property_partitions(property_partitions(only_ceo=only_ceo, limit=limit))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+    except Exception as e:
+        return f"Onverwachte fout: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+def explore_class(class_uri: str, sample_size: int = 1000) -> str:
+    """Ontdekt welke predicaten vanaf een klasse vertrekken en waar ze
+    naartoe leiden (doelklasse of datatype), op basis van een steekproef
+    van instanties.
+
+    Gebruik dit om iteratief door de graaf te navigeren bij het opbouwen van
+    een querypad: start bij de klasse van de vraag, volg het relevante
+    predicaat naar de doelklasse, en verken die opnieuw tot je bij de
+    gewenste waarde (literal) bent. In tegenstelling tot
+    ontology_describe_class() (statisch) is dit empirisch: het toont ook
+    paden die niet in de ontologie gedocumenteerd staan.
+
+    class_uri: volledige URI van de te verkennen klasse, bijv.
+    https://linkeddata.cultureelerfgoed.nl/def/ceo#Rijksmonument
+    sample_size: aantal instanties in de steekproef (100-10000).
+    """
+    try:
+        return format_class_paths(explore_class_paths(class_uri, sample_size=sample_size))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+    except Exception as e:
+        return f"Onverwachte fout: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+def explore_incoming(class_uri: str, sample_size: int = 1000) -> str:
+    """Ontdekt vanuit welke klassen en via welke predicaten er naar
+    instanties van deze klasse wordt verwezen (achteruit navigeren).
+
+    Gebruik dit voor vragen waarbij het pad omgekeerd loopt, zoals "bij
+    welk complex hoort dit rijksmonument": verken inkomend op Rijksmonument
+    en je vindt Complex -> heeftRijksmonument.
+
+    class_uri: volledige URI van de te verkennen klasse.
+    sample_size: aantal instanties in de steekproef (100-10000).
+    """
+    try:
+        return format_incoming_paths(explore_incoming_paths(class_uri, sample_size=sample_size))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+    except Exception as e:
+        return f"Onverwachte fout: {type(e).__name__}: {e}"
+
 
 @mcp.tool()
 def ontology_search(term: str) -> str:
