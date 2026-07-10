@@ -145,12 +145,8 @@ This reduces hallucinations when querying Dutch cultural heritage linked data.
 
 ## Current transport
 
-The current alpha release uses local `stdio` transport.
+By default, the MCP server uses local `stdio` transport: LM Studio starts it as a local process on the user's machine, using the configuration above.
 
-This means LM Studio starts the MCP server as a local process on the user's machine.
+## Remote HTTP deployment
 
-## Future direction
-
-Future versions may support remote HTTP MCP deployment.
-
-In that scenario, users would only need to configure a URL instead of installing Python locally.
+The server also supports Streamable HTTP transport via `python -m rce_cho_mcp.http_server`, so it can be hosted remotely instead of run locally — see `render.yaml` for a ready-to-use Render deployment. In that case, configure LM Studio with the server's URL instead of a local `command`/`cwd`; consult LM Studio's documentation for the exact remote-server configuration syntax.

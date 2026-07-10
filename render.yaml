@@ -11,8 +11,5 @@ services:
       - key: PYTHON_VERSION
         value: 3.14.0
 
-      - key: SPARQL_ENDPOINT
-        value: https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql
-
       - key: RCE_CHO_GRAPH
         value: https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce
