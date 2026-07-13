@@ -60,3 +60,11 @@ for _row in KNOWN_GRAPH_ROWS:
 del _row
 
 USER_AGENT = "rce-cho-mcp/0.2.0b1"
+
+# Public, unauthenticated GraphQL API of the NDE Network of Terms
+# (https://termennetwerk.netwerkdigitaalerfgoed.nl/), used for fuzzy
+# concept search with synonyms across published thesauri (CHT, ABR, ...).
+TERMENNETWERK_ENDPOINT = os.getenv(
+    "TERMENNETWERK_ENDPOINT",
+    "https://termennetwerk-api.netwerkdigitaalerfgoed.nl/graphql",
+)

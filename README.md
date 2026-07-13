@@ -26,11 +26,14 @@ Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
 * Query the public RCE CHO SPARQL endpoint.
 * Search and inspect the CEO ontology.
 * Resolve SKOS labels to concept URIs.
+* Fuzzy-search concepts (with synonyms) across the NDE Network of Terms, including external thesauri (Wikidata, AAT).
 * Inspect resource URIs.
 * Validate SPARQL queries before execution.
 * Execute SPARQL SELECT and ASK queries.
 * Provide dataset semantics for important modelling patterns.
 * Detect known Virtuoso-specific query pitfalls before execution.
+* Report live dataset statistics (triples, entities, per-class and per-property counts).
+* Explore actual query paths from/to a class via sampling, independent of what the ontology declares.
 
 ## Linked Data philosophy
 
@@ -128,6 +131,29 @@ Unlike the ontology tools above (which describe what is *defined* in the bundled
 
 * `resolve_concept_label`
 * `describe_resource_uri`
+
+### Concept search (NDE Network of Terms)
+
+* `zoek_concept_termennetwerk`
+* `lookup_termennetwerk_uri`
+
+`zoek_concept_termennetwerk` does a relevance-ranked, synonym-aware search across published terminology sources (CHT, ABR by default; Wikidata and AAT available) via the public, unauthenticated Network of Terms GraphQL API — unlike `resolve_concept_label`, which only does an exact `skos:prefLabel` match within our own named graphs.  
+`lookup_termennetwerk_uri` resolves external concept URIs (e.g. a `skos:exactMatch` target found via `describe_resource_uri`) back to labels.
+
+### Statistics
+
+* `dataset_statistics`
+* `class_instance_counts`
+* `property_usage_counts`
+
+These report live counts from the current dataset (~58M triples), refreshed daily — as opposed to `ontology_statistics`, which only counts what the static ontology definition declares. Full-dataset scans; `dataset_statistics` can take a couple of minutes.
+
+### Exploration
+
+* `explore_class`
+* `explore_incoming`
+
+Sample-based, empirical path discovery: `explore_class` finds which predicates lead out of a class and to what, `explore_incoming` finds which classes and predicates point into it. Useful for paths not yet covered by dataset semantics.
 
 ### Validation
 

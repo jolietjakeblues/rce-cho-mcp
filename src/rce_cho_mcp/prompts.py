@@ -39,8 +39,24 @@ Workflow:
    Gebruik hiervoor niet ontology_search() en niet resolve_concept_label(..., graph_name="owms").
 4. Gebruik resolve_concept_label() alleen voor labels die als SKOS-concept in een bekende named graph gezocht moeten worden.
    Gebruik graph_name="owms" alleen voor gemeenten en provincies.
+4b. Ken je de exacte schrijfwijze van een CHT- of ABR-term niet, of wil je synoniemen
+    en verwante termen vinden (bv. "kerk" -> narrower "kapel")? Gebruik dan eerst
+    zoek_concept_termennetwerk() (fuzzy zoeken op het NDE Termennetwerk) om de
+    concept-URI te vinden, en gebruik die URI vervolgens in de SPARQL-query.
+    Gebruik lookup_termennetwerk_uri() om een bekende externe URI (bv. een
+    skos:exactMatch naar Wikidata, gevonden via describe_resource_uri()) terug
+    te vertalen naar een leesbaar label.
 5. Gebruik graphs_list() wanneer onduidelijk is in welke graph data zich bevindt.
 6. Gebruik describe_resource_uri() om onbekende URI's te inspecteren.
+6b. Twijfel je of een pad uit de ontologie ook echt in de data voorkomt, of mist de
+    ontologie een pad? Gebruik dan explore_class() (uitgaand) of explore_incoming()
+    (inkomend) voor een empirische steekproef op de live data, en
+    class_instance_counts() / property_usage_counts() om te zien of een klasse of
+    property daadwerkelijk gevuld is. Gebruik dataset_statistics() voor de
+    dataset-brede kerncijfers (triples/entiteiten/klassen/properties); dit zijn
+    live tellingen, in tegenstelling tot ontology_statistics() dat alleen de
+    ontologie-definitie telt. Deze full-dataset queries kunnen ruim een minuut
+    duren, dataset_statistics() zelfs een paar minuten (vier scans achter elkaar).
 7. Stel pas daarna een SPARQL-query op.
 8. Gebruik validate_query() of validate_query_structured() om bekende valkuilen
    te controleren.
@@ -71,6 +87,14 @@ Belangrijke RCE-patronen:
   ceo:heeftBasisregistratieRelatie
   -> ceo:heeftBAGRelatie
   -> ceo:volledigAdres (ook: ceo:postcode, ceo:huisnummer op dezelfde BAGRelatie)
+  -> ceo:verblijfsobjectIdentificatie (xsd:string, bv. "0363010000588383" — het
+     BAG-verblijfsobjectnummer, ook op dezelfde BAGRelatie)
+  -> ceo:heeftVerblijfsobject (object property naar de externe BAG-URI, bv.
+     http://bag.basisregistraties.overheid.nl/bag/id/verblijfsobject/...)
+  Let op: een aanwezig verblijfsobjectnummer garandeert niet dat dat verblijfsobject
+  nog bestaat in de actuele BAG (samenvoeging, sloop of hernummering na de
+  RCE-registratie komt voor). Voor de actuele status is de BAG Individuele
+  Bevragingen-API nodig, niet deze dataset.
 - Directe identificatie:
   ceo:rijksmonumentnummer / ceo:complexnummer / ceo:gezichtsnummer /
   ceo:werelderfgoednummer (xsd:string, altijd gequote filteren)
@@ -78,6 +102,15 @@ Belangrijke RCE-patronen:
 Ontwerpregels:
 
 - Verzin geen classes, properties, paden of URI's.
+- Bouw nooit een monument-URI door een rijksmonumentnummer in het URI-pad te
+  plakken (bv. .../rijksmonument/{rijksmonumentnummer}). Het numerieke deel in
+  die URI is het interne cultuurhistorischObjectnummer, niet het
+  rijksmonumentnummer -- deze twee nummers verschillen meestal en de fout geeft
+  geen foutmelding, alleen het verkeerde monument (bevestigd: rijksmonumentnummer
+  "16388" hoort bij .../rijksmonument/31287, terwijl .../rijksmonument/16388 zelf
+  bestaat maar cultuurhistorischObjectnummer "16388" en rijksmonumentnummer
+  "21625" heeft). Filter altijd op ceo:rijksmonumentnummer (of complexnummer /
+  gezichtsnummer / werelderfgoednummer) en laat de query de URI opzoeken.
 - Laat de resolver meerdere matches teruggeven. Kies niet te vroeg.
 - Labels en namen zijn meestal presentatie, geen selectiecriterium.
 - Bij vragen over functie, type, plaats, gemeente of provincie:
