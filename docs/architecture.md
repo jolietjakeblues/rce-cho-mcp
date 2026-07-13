@@ -148,6 +148,12 @@ src/
 
         sparql.py
 
+        statistics.py
+
+        explore.py
+
+        termennetwerk.py
+
         validator.py
 
         prompts.py

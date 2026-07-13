@@ -190,6 +190,37 @@ Ontwerpprincipe:
 
 De resolver kiest nooit zelf tussen meerdere resultaten.
 
+### 5b. Conceptzoeken (NDE Termennetwerk)
+
+Zoekt SKOS-concepten op natuurlijke taal, met synoniemen en verwante termen,
+over gepubliceerde thesauri (via de publieke, auth-vrije GraphQL-API van het
+NDE Termennetwerk) — een aanvulling op de resolver, niet een vervanging.
+
+Huidige tools:
+
+- `zoek_concept_termennetwerk`
+- `lookup_termennetwerk_uri`
+
+Verschil met `resolve_concept_label`:
+
+```text
+resolve_concept_label:
+  exacte skos:prefLabel-match, alleen binnen onze eigen named graphs
+  → vereist dat je de precieze schrijfwijze al kent
+
+zoek_concept_termennetwerk:
+  relevantie-gerangschikt, matcht ook altLabel-synoniemen
+  → toont broader/narrower-termen
+  → doorzoekt ook externe bronnen (Wikidata, AAT) naast CHT/ABR
+```
+
+`lookup_termennetwerk_uri` vertaalt een bekende externe concept-URI (bv. een
+`skos:exactMatch` naar Wikidata, gevonden via `describe_resource_uri`) terug
+naar een leesbaar label.
+
+Standaardbronnen: CHT en ABR (de RCE-thesauri). Andere bronnen via de
+`sources`-parameter (`wikidata`, `aat`, of een volledige bron-URI).
+
 ### 6. Validator
 
 Controleert SPARQL-query's op bekende valkuilen.
@@ -265,6 +296,59 @@ geof:sfWithin-timeouts). Een queryfout (bv. een syntaxfout, 4xx) triggert geen
 fallback, omdat dezelfde query daar identiek zou falen. Overschrijfbaar via de
 omgevingsvariabelen `SPARQL_ENDPOINT` en `SPARQL_FALLBACK_ENDPOINT`.
 
+### 8. Statistics
+
+Geeft live cijfers over de actuele dataset, in plaats van wat de
+ontologie-definitie beweert te bevatten.
+
+Huidige tools:
+
+- `dataset_statistics` — triples, entiteiten, klassen en properties in gebruik
+- `class_instance_counts` — aantal instanties per klasse
+- `property_usage_counts` — aantal triples per property
+
+```text
+ontology_statistics():
+  telt wat de ontologie DEFINIEERT (statisch, uit CEO_RCE.ttl)
+
+dataset_statistics() / class_instance_counts() / property_usage_counts():
+  telt wat er FEITELIJK in de dataset staat (live, dagelijks ververst)
+```
+
+Een klasse of property die de ontologie kent maar die hier ontbreekt of op 0
+staat, bevat geen instanties in de live data — belangrijk om te weten vóórdat
+een query op die klasse wordt opgesteld.
+
+Dit zijn full-dataset scans (~58 miljoen triples zonder `GRAPH`-restrictie,
+dat is de hele dataset). Gemeten: `dataset_statistics` ~114s (vier
+opeenvolgende scans), `property_usage_counts` ~57s, `class_instance_counts`
+~21s.
+
+### 9. Exploration
+
+Ontdekt empirisch welke querypaden daadwerkelijk in de data bestaan, op basis
+van een steekproef — onafhankelijk van wat de ontologie of dataset semantics
+al documenteren.
+
+Huidige tools:
+
+- `explore_class` — welke predicaten vertrekken vanaf een klasse, en waar ze naartoe leiden (doelklasse of datatype)
+- `explore_incoming` — welke klassen en predicaten verwijzen náár een klasse (de omgekeerde richting)
+
+Voorbeeld:
+
+```text
+explore_incoming(ceo:Rijksmonument):
+  ceo:Complex --heeftRijksmonument--> ceo:Rijksmonument
+  ceo:Kennisregistratie --heeftBetrekkingOp--> ceo:Rijksmonument
+```
+
+Nuttig voor vragen waarvan het pad nog niet in `semantics_describe_topic()`
+of de workflow-instructies staat, of om te verifiëren of een in de ontologie
+gedeclareerd pad ook daadwerkelijk gevuld is. De getoonde aantallen gelden
+alleen binnen de steekproef, niet voor de hele dataset. Snel (steekproef,
+geen full-dataset scan): enkele seconden.
+
 ## Bekende performance- en datakwaliteitskenmerken
 
 - **Query-resultaat-caching**: het endpoint lijkt te cachen op exacte
@@ -279,6 +363,15 @@ omgevingsvariabelen `SPARQL_ENDPOINT` en `SPARQL_FALLBACK_ENDPOINT`.
   zijn. Test nieuwe verzamel-achtige queries niet alleen op een klein
   eerste-resultaat, maar ook op een entiteit waarvan bekend is dat die
   meerdere relaties van hetzelfde type heeft.
+- **Monument-URI's zijn niet opgebouwd uit het rijksmonumentnummer**: het
+  numerieke deel in `.../rijksmonument/{N}` is het interne
+  `cultuurhistorischObjectnummer`, niet `ceo:rijksmonumentnummer` — deze twee
+  nummers verschillen meestal. Bevestigd: `ceo:rijksmonumentnummer "16388"`
+  hoort bij `.../rijksmonument/31287`, terwijl `.../rijksmonument/16388` zelf
+  bestaat maar `cultuurhistorischObjectnummer "16388"` en
+  `rijksmonumentnummer "21625"` heeft. Een zelf opgebouwde URI faalt hier niet
+  met een foutmelding — hij levert stilzwijgend het verkeerde monument.
+  Filter altijd op `ceo:rijksmonumentnummer` en laat de query de URI opzoeken.
 
 ## Belangrijk ontwerpprincipe
 
@@ -325,12 +418,14 @@ Dat is de verantwoordelijkheid van de client of van een aparte reference impleme
 
 Mogelijke uitbreidingen:
 
-- `search_concepts`
 - `list_prefixes`
 - `structured_results`
 - `structured_ontology`
 - `python_sdk`
 - `rest_api`
+
+(`search_concepts` is inmiddels gebouwd als `zoek_concept_termennetwerk`, zie
+capabilitygroep 5b.)
 
 Nieuwe capabilities worden alleen toegevoegd wanneer ze generiek bruikbaar zijn voor meerdere clients.
 
