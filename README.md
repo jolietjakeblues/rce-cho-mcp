@@ -122,6 +122,10 @@ Relevant triples may be spread across multiple named graphs.
 
 Unlike the ontology tools above (which describe what is *defined* in the bundled CEO ontology), these tools query the live endpoint for what is *actually present* in the data: instance counts per class/property (including ontology classes with zero instances), and empirical forward/backward path discovery based on a sample of real instances.
 
+`dataset_statistics`, `class_instance_counts` and `property_usage_counts` report live counts from the current dataset (~58M triples), refreshed daily. These are full-dataset scans; `dataset_statistics` can take a couple of minutes.
+
+`explore_class` finds which predicates lead out of a class and to what; `explore_incoming` finds which classes and predicates point into it (the reverse direction). Both are sample-based and fast (a few seconds) — useful for paths not yet covered by dataset semantics. Counts only apply within the sample, not dataset-wide.
+
 ### Dataset semantics
 
 * `semantics_list_topics`
@@ -140,21 +144,6 @@ Unlike the ontology tools above (which describe what is *defined* in the bundled
 `zoek_concept_termennetwerk` does a relevance-ranked, synonym-aware search across published terminology sources (CHT, ABR by default; Wikidata and AAT available) via the public, unauthenticated Network of Terms GraphQL API — unlike `resolve_concept_label`, which only does an exact `skos:prefLabel` match within our own named graphs.  
 `lookup_termennetwerk_uri` resolves external concept URIs (e.g. a `skos:exactMatch` target found via `describe_resource_uri`) back to labels.
 
-### Statistics
-
-* `dataset_statistics`
-* `class_instance_counts`
-* `property_usage_counts`
-
-These report live counts from the current dataset (~58M triples), refreshed daily — as opposed to `ontology_statistics`, which only counts what the static ontology definition declares. Full-dataset scans; `dataset_statistics` can take a couple of minutes.
-
-### Exploration
-
-* `explore_class`
-* `explore_incoming`
-
-Sample-based, empirical path discovery: `explore_class` finds which predicates lead out of a class and to what, `explore_incoming` finds which classes and predicates point into it. Useful for paths not yet covered by dataset semantics.
-
 ### Validation
 
 * `validate_query`
@@ -163,10 +152,14 @@ Sample-based, empirical path discovery: `explore_class` finds which predicates l
 ### Validation checks include:
 
 * unsafe label filters (silent zero-result risk)
+* untyped numeric literals on string properties (e.g. `ceo:huisnummer 19` instead of `ceo:huisnummer "19"`, also a silent zero-result risk)
 * missing `DISTINCT` or `COUNT` alias
 * `SELECT/FROM/WHERE` ordering
+* suspicious/non-existent prefixes (`ceosp:`, `ceox:`) and manual language filters (`LANG()`/`LANGMATCHES()`)
 * GeoSPARQL relations that cause structural timeouts on Virtuoso (`geof:sfWithin` etc.)
 * `GROUP BY` on long text fields that trigger Virtuoso overflow errors
+* `ORDER BY` combined with `OPTIONAL` joins, which causes a consistent HTTP 504 on this endpoint
+* multiple independent `OPTIONAL` blocks in one query, which produces a cartesian product instead of separate facts
 
 ### Execution
 

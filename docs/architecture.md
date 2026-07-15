@@ -148,9 +148,7 @@ src/
 
         sparql.py
 
-        statistics.py
-
-        explore.py
+        stats.py
 
         termennetwerk.py
 
