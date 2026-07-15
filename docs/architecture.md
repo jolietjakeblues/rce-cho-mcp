@@ -86,40 +86,27 @@ User
 
 ↓
 
-Claude Desktop
+MCP client (e.g. Claude Desktop, Claude Code)
 
 ↓
 
-MCP Server
+MCP Server (ontology, live stats/exploration, dataset semantics,
+concept resolution, validation and execution -- exposed as
+independent tool capabilities, not a fixed pipeline)
 
 ↓
 
-Ontology
-
-↓
-
-Query Planner
-
-↓
-
-Validator
-
-↓
-
-SPARQL Executor
-
-↓
-
-RCE CHO Endpoint
-
-↓
-
-Formatter
+RCE CHO SPARQL endpoint
 
 ↓
 
 Natural language response
 ```
+
+There is no query planner and no enforced ordering: the MCP exposes
+capabilities, and the client (the LLM) decides which tools to call and in
+what order, guided by `WORKFLOW_INSTRUCTIONS` in `prompts.py`. See "Design
+principle" in the README.
 
 ---
 
@@ -167,10 +154,8 @@ src/
             CEO_RCE.ttl
 ```
 
-Note: this reflects the actual module layout. Earlier drafts of this
-document described a planned `tools.py` / `planner.py` / `ontology.py` /
-`formatter.py` / `examples.py` split that was never built this way; the
-responsibilities described below map onto the modules listed above.
+Note: `http_server.py` (not shown above, alongside `server.py`) runs the
+server over Streamable HTTP for deployments like Render, instead of stdio.
 
 ---
 
@@ -178,141 +163,118 @@ responsibilities described below map onto the modules listed above.
 
 ## server.py
 
-Registers the MCP server.
-
-Registers all tools.
-
-Contains no business logic.
+Registers the MCP server and every tool (`@mcp.tool()`). Contains no
+business logic itself -- each tool delegates to the module responsible
+for that capability.
 
 ---
 
-## tools.py
+## http_server.py
 
-Contains the MCP tools exposed to Claude.
-
-Examples:
-
-* get_ontology_context()
-* validate_query()
-* query_sparql()
-* describe_resource()
+Runs the server over Streamable HTTP (used in production, e.g. on
+Render) instead of stdio.
 
 ---
 
-## ontology.py
+## config.py
 
-Contains all ontology knowledge.
-
-Examples:
-
-* prefixes
-
-* classes
-
-* properties
-
-* semantic mappings
-
-* query rules
-
-* province URIs
+Environment-driven configuration: endpoint URLs, default/fallback
+dataset graph, Network of Terms endpoint.
 
 ---
 
-## planner.py
+## ontology/ (loader.py, registry.py, api.py)
 
-Transforms a natural language question into a query plan.
+Loads and queries the bundled CEO ontology (`CEO_RCE.ttl`): classes,
+properties, domains/ranges, labels and comments. Static -- describes
+what the ontology *defines*, not what the live data contains.
 
-Example:
+---
 
-Question
+## stats.py
 
-↓
+Live dataset statistics and empirical path exploration: dataset-wide
+totals, per-class/per-property instance counts, and forward/backward
+predicate discovery sampled from live instances. Complements `ontology/`
+with what is *actually present* in the data.
 
-Entity detection
+---
 
-↓
+## resolver.py
 
-Intent detection
+Resolves SKOS `prefLabel`s to concept URIs within known named graphs,
+and describes an arbitrary resource URI (all its predicates and values).
 
-↓
+---
 
-Required ontology paths
+## semantics.py
 
-↓
+Interpretation rules for dataset semantics: function, legal status,
+monument type, name, description, address -- the CEO paths and pitfalls
+a client needs to query these correctly.
 
-SPARQL template
+---
+
+## graphs.py
+
+Registry of known CHO named graphs.
+
+---
+
+## termennetwerk.py
+
+Client for the public NDE Network of Terms GraphQL API: fuzzy,
+synonym-aware concept search (CHT, ABR, Wikidata, AAT) and reverse
+URI-to-label lookup.
 
 ---
 
 ## validator.py
 
-Checks generated SPARQL before execution.
-
-Examples:
-
-* syntax order
-
-* missing FROM
-
-* forbidden properties
-
-* invalid prefixes
-
-* ontology consistency
+Checks a SPARQL query against known RCE CHO pitfalls before execution:
+unsafe label filters, forbidden prefixes, untyped numeric literals,
+`ORDER BY`+`OPTIONAL` timeouts, cartesian-product risk, `GROUP BY`
+overflow, GeoSPARQL timeout patterns, and query-clause ordering. Does
+not validate classes or properties against the ontology.
 
 ---
 
 ## sparql.py
 
-Responsible only for communication with the SPARQL endpoint.
-
-No ontology logic.
-
-No prompt logic.
-
----
-
-## formatter.py
-
-Transforms raw SPARQL JSON results into readable Dutch.
+Executes SPARQL against the RCE CHO endpoint (POST, with a Speedy ->
+Virtuoso fallback and HTTP-error classification), formats results as
+text, and converts SELECT results with a WKT variable into GeoJSON.
 
 ---
 
 ## prompts.py
 
-Contains workflow instructions for the language model.
-
-No ontology data.
-
----
-
-## examples.py
-
-Contains curated example queries.
-
-Used only as guidance.
+Contains `WORKFLOW_INSTRUCTIONS`, the server-level guidance (passed to
+FastMCP's `instructions=`) covering tool ordering, dataset-semantics
+patterns and SPARQL design rules.
 
 ---
 
 # Processing Pipeline
 
-Every question follows the same pipeline.
+There is no fixed pipeline the client must follow -- see "System
+Architecture" above. In practice, most questions touch these capabilities,
+loosely in this order, as guided by `WORKFLOW_INSTRUCTIONS`:
 
 ```
 Question
 
 ↓
 
-Ontology context
+Ontology / live-stats context (what classes, properties and paths exist)
 
 ↓
 
-Query planning
+Concept resolution (natural-language terms -> concept URIs)
 
 ↓
 
-SPARQL generation
+SPARQL construction (by the client/LLM, not a planner module)
 
 ↓
 
@@ -324,14 +286,8 @@ Execution
 
 ↓
 
-Formatting
-
-↓
-
 Answer
 ```
-
----
 
 # Development Strategy
 
@@ -351,11 +307,18 @@ Basic query execution
 
 ## Version 0.2
 
-Query planner
-
 Semantic mappings
 
 Improved validation
+
+Live dataset statistics and empirical path exploration
+
+Network of Terms concept search
+
+Note: the originally planned dedicated query-planner module was dropped
+in favour of the capabilities model described under "System Architecture"
+-- the client/LLM builds the SPARQL query itself from the exposed tools,
+guided by `WORKFLOW_INSTRUCTIONS`.
 
 ---
 
