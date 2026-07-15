@@ -8,13 +8,11 @@ from rce_cho_mcp.ontology.api import (
     search_ontology,
     statistics,
 )
-from rce_cho_mcp.explore import verken_inkomend, verken_klasse
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.resolver import describe_resource, resolve_label
 from rce_cho_mcp.semantics import format_topic, format_topics
 from rce_cho_mcp.sparql import classify_error, execute_sparql, format_results, rd_to_wgs84, to_geojson
 from rce_cho_mcp.graphs import format_graphs
-from rce_cho_mcp.statistics import dataset_totalen, klasse_partities, property_partities
 from rce_cho_mcp.termennetwerk import lookup_terms, search_terms
 from rce_cho_mcp.validator import format_validation_report, validate_sparql
 from rce_cho_mcp.stats import (
@@ -60,7 +58,9 @@ def dataset_statistics() -> str:
 
     In tegenstelling tot ontology_statistics() (telt wat er in het gebundelde
     ontologiebestand is gedefinieerd) telt dit wat er daadwerkelijk in de
-    live data staat.
+    live, dagelijks ververste data staat. Dit zijn vier opeenvolgende
+    full-dataset scans (~58 miljoen triples) en kunnen samen ruim een minuut
+    duren, soms tot een paar minuten.
     """
     try:
         return format_totals(dataset_totals())
@@ -78,9 +78,11 @@ def class_instance_counts(only_ceo: bool = True, limit: int = 100) -> str:
 
     Toont ook welke ontologieklassen NIET in de data voorkomen: klassen die
     in ontology_describe_class() bestaan maar hier ontbreken hebben nul
-    instanties in de praktijk.
+    instanties in de praktijk. Full-dataset GROUP BY-scan, kan tot ongeveer
+    een minuut duren.
 
-    only_ceo: beperk tot klassen in de CEO-namespace (standaard True).
+    only_ceo: beperk tot klassen in de CEO-namespace (standaard True). Zet
+    op False om ook infrastructuurklassen te zien (owl:Class, skos:Concept, ...).
     limit: maximum aantal getoonde klassen (1-1000).
     """
     try:
@@ -98,9 +100,11 @@ def property_usage_counts(only_ceo: bool = True, limit: int = 100) -> str:
     """Telt per property het aantal triples in de live dataset.
 
     Properties met lage aantallen zijn dun gevuld -- relevant om in te
-    schatten of een querypad kansrijk is voordat je 'm schrijft.
+    schatten of een querypad kansrijk is voordat je 'm schrijft. Full-dataset
+    GROUP BY-scan, kan tot ongeveer een minuut duren.
 
-    only_ceo: beperk tot properties in de CEO-namespace (standaard True).
+    only_ceo: beperk tot properties in de CEO-namespace (standaard True). Zet
+    op False om ook infrastructuurproperties te zien (rdf:type, skos:prefLabel, ...).
     limit: maximum aantal getoonde properties (1-1000).
     """
     try:
@@ -124,7 +128,8 @@ def explore_class(class_uri: str, sample_size: int = 1000) -> str:
     predicaat naar de doelklasse, en verken die opnieuw tot je bij de
     gewenste waarde (literal) bent. In tegenstelling tot
     ontology_describe_class() (statisch) is dit empirisch: het toont ook
-    paden die niet in de ontologie gedocumenteerd staan.
+    paden die niet in de ontologie gedocumenteerd staan. De getoonde
+    aantallen gelden alleen binnen de steekproef, niet voor de hele dataset.
 
     class_uri: volledige URI van de te verkennen klasse, bijv.
     https://linkeddata.cultureelerfgoed.nl/def/ceo#Rijksmonument
@@ -147,7 +152,8 @@ def explore_incoming(class_uri: str, sample_size: int = 1000) -> str:
 
     Gebruik dit voor vragen waarbij het pad omgekeerd loopt, zoals "bij
     welk complex hoort dit rijksmonument": verken inkomend op Rijksmonument
-    en je vindt Complex -> heeftRijksmonument.
+    en je vindt Complex -> heeftRijksmonument. De getoonde aantallen gelden
+    alleen binnen de steekproef, niet voor de hele dataset.
 
     class_uri: volledige URI van de te verkennen klasse.
     sample_size: aantal instanties in de steekproef (100-10000).
@@ -164,7 +170,13 @@ def explore_incoming(class_uri: str, sample_size: int = 1000) -> str:
 
 @mcp.tool()
 def ontology_search(term: str) -> str:
-    """Zoek classes en properties in de CEO-ontologie."""
+    """Zoek classes en properties in de CEO-ontologie op naam/trefwoord.
+
+    Dit doorzoekt alleen de schema-definitie (class- en property-namen), geen
+    SKOS-concepten of labels in de data. Zoek je een concept/label (bv. een
+    functie, plaatsnaam of thesaurusterm), gebruik dan resolve_concept_label()
+    of zoek_concept_termennetwerk().
+    """
     return search_ontology(term)
 
 
@@ -177,90 +189,6 @@ def ontology_describe_class(class_name: str) -> str:
 def ontology_describe_property(property_name: str) -> str:
     """Beschrijf een CEO-property op basis van de ingelezen ontologie."""
     return describe_property(property_name)
-
-@mcp.tool()
-def dataset_statistics() -> str:
-    """Haal live kerncijfers van de dataset op: aantal triples, entiteiten, klassen
-    en properties die daadwerkelijk in de data voorkomen.
-
-    Anders dan ontology_statistics() (dat alleen telt wat de ontologie-definitie
-    bevat) telt dit de actuele, dagelijks ververste data zelf. Dit zijn vier
-    opeenvolgende full-dataset scans (~58 miljoen triples) en kunnen samen
-    ruim een minuut duren, soms tot een paar minuten.
-    """
-    try:
-        totalen = dataset_totalen()
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} bij ophalen van datasettotalen.\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout bij ophalen van datasettotalen: {type(e).__name__}: {e}"
-
-    return (
-        f"Triples: {totalen['triples']}\n"
-        f"Entiteiten (subjecten met een type): {totalen['entiteiten']}\n"
-        f"Klassen in gebruik: {totalen['klassen']}\n"
-        f"Properties in gebruik: {totalen['properties']}\n"
-        f"Endpoint: {totalen['endpoint']}"
-    )
-
-@mcp.tool()
-def class_instance_counts(alleen_ceo: bool = True) -> str:
-    """Tel het aantal instanties per klasse in de volledige, actuele dataset.
-
-    Vergelijk dit met ontology_search()/ontology_describe_class(): een klasse
-    die de ontologie kent maar die hier ontbreekt of op 0 staat, bevat geen
-    instanties in de live data. Full-dataset GROUP BY-scan, kan tot ongeveer
-    een minuut duren.
-
-    alleen_ceo: beperk tot klassen in de CEO-namespace (compacter, relevanter).
-    Zet op False om ook infrastructuurklassen (owl:Class, skos:Concept, ...) te zien.
-    """
-    try:
-        partities = klasse_partities(alleen_ceo=alleen_ceo)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} bij tellen per klasse.\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout bij tellen per klasse: {type(e).__name__}: {e}"
-
-    if not partities:
-        return "Geen klassen gevonden."
-
-    suffix = " (alleen CEO-namespace)" if alleen_ceo else ""
-    lines = [f"{len(partities)} klasse(n) gevonden{suffix}:"]
-    lines.extend(f"- {p['klasse']}: {p['aantal']}" for p in partities)
-    return "\n".join(lines)
-
-@mcp.tool()
-def property_usage_counts(alleen_ceo: bool = True) -> str:
-    """Tel het aantal triples per property in de volledige, actuele dataset.
-
-    Properties met een laag aantal zijn dun gevuld: een querypad kan in theorie
-    bestaan maar zelden data opleveren. Full-dataset GROUP BY-scan, kan tot
-    ongeveer een minuut duren.
-
-    alleen_ceo: beperk tot properties in de CEO-namespace (compacter, relevanter).
-    Zet op False om ook infrastructuurproperties (rdf:type, skos:prefLabel, ...) te zien.
-    """
-    try:
-        partities = property_partities(alleen_ceo=alleen_ceo)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} bij tellen per property.\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout bij tellen per property: {type(e).__name__}: {e}"
-
-    if not partities:
-        return "Geen properties gevonden."
-
-    suffix = " (alleen CEO-namespace)" if alleen_ceo else ""
-    lines = [f"{len(partities)} property/properties gevonden{suffix}:"]
-    lines.extend(f"- {p['property']}: {p['aantal']}" for p in partities)
-    return "\n".join(lines)
 
 @mcp.tool()
 def semantics_list_topics() -> str:
@@ -420,80 +348,27 @@ def describe_resource_uri(uri: str) -> str:
     return "\n".join(lines)
 
 @mcp.tool()
-def explore_class(klasse: str, steekproef: int = 1000) -> str:
-    """Ontdek welke predicaten vanaf een klasse vertrekken en waar ze naartoe
-    leiden (doelklasse of datatype), op basis van een steekproef van instanties.
-
-    Gebruik dit om iteratief door de graaf te navigeren bij het opbouwen van
-    een querypad: start bij de klasse van de vraag, volg het relevante
-    predicaat naar de doelklasse, en verken die opnieuw tot je bij de
-    gewenste waarde (literal) bent. Nuttig voor paden die nog niet in
-    semantics_describe_topic() of de workflow-instructies gedocumenteerd staan.
-
-    klasse: volledige class-URI, bv. https://linkeddata.cultureelerfgoed.nl/def/ceo#Rijksmonument
-    steekproef: aantal instanties in de steekproef (groter = vollediger beeld,
-    maar zwaarder voor het endpoint). De getoonde aantallen gelden alleen
-    binnen de steekproef, niet voor de hele dataset.
-    """
-    try:
-        paden = verken_klasse(klasse, steekproef=steekproef)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} bij verkennen van {klasse}.\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout bij verkennen van {klasse}: {type(e).__name__}: {e}"
-
-    if not paden:
-        return f"Geen paden gevonden vanaf {klasse} (steekproef: {steekproef}). Bestaat deze klasse-URI?"
-
-    lines = [f"{len(paden)} pad(en) gevonden vanaf {klasse} (steekproef: {steekproef}):"]
-    lines.extend(
-        f"- {p['predicaat']} -> {p['doel']} ({p['soort']}, {p['aantal']}x in steekproef)"
-        for p in paden
-    )
-    return "\n".join(lines)
-
-@mcp.tool()
-def explore_incoming(klasse: str, steekproef: int = 1000) -> str:
-    """Ontdek vanuit welke klassen en via welke predicaten er naar instanties van
-    deze klasse wordt verwezen (achteruit navigeren), op basis van een steekproef.
-
-    Gebruik dit voor vragen waarbij het pad omgekeerd loopt, zoals "bij welk
-    complex hoort dit rijksmonument": verken inkomend op Rijksmonument en je
-    vindt Complex -> heeftRijksmonument.
-
-    klasse: volledige class-URI.
-    steekproef: aantal instanties in de steekproef. De getoonde aantallen
-    gelden alleen binnen de steekproef, niet voor de hele dataset.
-    """
-    try:
-        paden = verken_inkomend(klasse, steekproef=steekproef)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} bij verkennen van {klasse}.\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout bij verkennen van {klasse}: {type(e).__name__}: {e}"
-
-    if not paden:
-        return f"Geen inkomende paden gevonden naar {klasse} (steekproef: {steekproef}). Bestaat deze klasse-URI?"
-
-    lines = [f"{len(paden)} inkomend(e) pad(en) gevonden naar {klasse} (steekproef: {steekproef}):"]
-    lines.extend(
-        f"- {p['bronklasse']} -> {p['predicaat']} -> {klasse} ({p['aantal']}x in steekproef)"
-        for p in paden
-    )
-    return "\n".join(lines)
-
-@mcp.tool()
 def validate_query(sparql_query: str) -> str:
-    """Valideer een SPARQL-query zonder deze uit te voeren."""
+    """Controleert een SPARQL-query op bekende RCE CHO-valkuilen, zonder de
+    query uit te voeren: verdachte/niet-bestaande prefixes, een taalgetagd
+    label vergelijken met een kale string (zie query_sparql), ORDER BY samen
+    met OPTIONAL (geeft consistent HTTP 504) en cartesisch-productrisico bij
+    meerdere onafhankelijke multi-valued OPTIONAL-blokken.
+
+    Valideert geen classes of properties tegen de ontologie -- gebruik
+    daarvoor ontology_search()/ontology_describe_class(). Geeft platte tekst
+    terug; gebruik validate_query_structured() als je errors en warnings los
+    wilt verwerken.
+    """
     return format_validation_report(sparql_query)
 
 @mcp.tool()
 def validate_query_structured(sparql_query: str) -> dict:
-    """Valideer een SPARQL-query en geef errors/warnings gestructureerd terug."""
+    """Zelfde controles als validate_query(), maar als
+    {"valid": bool, "errors": [...], "warnings": [...]} in plaats van platte
+    tekst -- gebruik dit wanneer je programmatisch op errors/warnings wilt
+    reageren, bv. vóór query_sparql() om het taalgetag-labelpatroon te checken.
+    """
     return validate_sparql(sparql_query)
 
 @mcp.tool()
@@ -525,7 +400,15 @@ def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
 
 @mcp.tool()
 def query_sparql_json(sparql_query: str) -> dict:
-    """Voer een SPARQL SELECT of ASK query uit en geef het ruwe JSON-resultaat terug."""
+    """Voer een SPARQL SELECT of ASK query uit en geef het ruwe JSON-resultaat terug.
+
+    Let op: skos:prefLabel-waarden zijn taalgetagd (bv. "Zwolle"@nl). Een
+    FILTER die een labelvariabele vergelijkt met een kale string (FILTER(?label
+    = "Zwolle") of FILTER(?label IN (...))) geeft stil 0 resultaten, zonder
+    fout. Gebruik resolve_concept_label() om eerst de concept-URI op te
+    halen, of wrap de vergelijking in STR(). Gebruik validate_query_structured()
+    om dit patroon vooraf te laten controleren.
+    """
     try:
         return execute_sparql(sparql_query)
 
@@ -554,6 +437,11 @@ def query_sparql_geojson(
     convert_rd: bool = False,
 ) -> dict:
     """Voer een SPARQL SELECT query uit en geef het resultaat terug als GeoJSON FeatureCollection.
+
+    Let op: skos:prefLabel-waarden zijn taalgetagd (bv. "Zwolle"@nl). Een FILTER
+    die een labelvariabele vergelijkt met een kale string geeft stil 0 resultaten,
+    zonder fout -- gebruik resolve_concept_label() of wrap de vergelijking in
+    STR(). Zie query_sparql() voor details.
 
     wkt_var: naam van de resultaatvariabele die de WKT-geometrie bevat (standaard: 'wkt').
     convert_rd: zet op True wanneer de query RD-coördinaten (EPSG:28992) oplevert,

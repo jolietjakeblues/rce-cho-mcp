@@ -13,7 +13,7 @@ CEO_NS = "https://linkeddata.cultureelerfgoed.nl/def/ceo#"
 
 _MIN_SAMPLE_SIZE = 100
 _MAX_SAMPLE_SIZE = 10_000
-_LONG_QUERY_TIMEOUT = 60
+_LONG_QUERY_TIMEOUT = 120
 
 
 def _rows(data: dict) -> list[dict]:
