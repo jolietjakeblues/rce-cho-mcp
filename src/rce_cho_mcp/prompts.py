@@ -144,4 +144,20 @@ Ontwerpregels:
   dezelfde BRK-relatie op één monument). Dedupliceer verzamel-resultaten
   (tellingen, lijsten) altijd met DISTINCT of in code, anders vertekent dit
   het resultaat.
+- Neem bij een nieuw soort adres- of identificatie-vraag niet aan dat een
+  patroon dat bij één voorbeeldobject werkte, ook voor alle andere objecten
+  geldt. Test met minimaal 2-3 verschillende objecten (bij voorkeur uit
+  verschillende categorieën: gebouwd monument, archeologisch monument,
+  ligplaats/standplaats) voordat je een aanpak als algemeen geldig aanneemt.
+- Is een resultaat leeg, onvolledig of verrassend eenduidig (bijvoorbeeld
+  precies 1 resultaat waar meerdere verwacht zouden kunnen worden)?
+  Controleer eerst of de gebruikte query of het endpoint zelf een beperking
+  heeft (vaste REST-wrapper, LIMIT, silent filter-falen -- zie
+  semantics_describe_topic('rest_api_wrappers')) voordat je concludeert dat
+  de brondata leeg of enkelvoudig is.
+- Wees expliciet wantrouwend tegenover CQL_FILTER en vergelijkbare
+  server-side filters op WFS-endpoints buiten het eigen SPARQL-endpoint:
+  test met een bekende, verifieerbare waarde of het filter daadwerkelijk
+  toepast, in plaats van aan te nemen dat een 200-status en geldige JSON
+  betekent dat het filter werkte.
 """
