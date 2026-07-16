@@ -101,6 +101,7 @@ Huidige topics:
 - `descriptions`
 - `identifiers`
 - `addresses`
+- `rest_api_wrappers`
 - `geometry`
 
 Belangrijke patronen:

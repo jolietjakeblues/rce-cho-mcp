@@ -229,6 +229,62 @@ SEMANTIC_TOPICS = {
                     "queries op en combineer ze in code."
                 ),
             },
+            {
+                "name": "Meerdere volledigAdres-waarden per verblijfsobject",
+                "path": [
+                    "ceo:heeftBasisregistratieRelatie",
+                    "ceo:heeftBAGRelatie",
+                    "ceo:volledigAdres",
+                ],
+                "guidance": (
+                    "ceo:volledigAdres kan meerdere, verschillende waarden hebben "
+                    "voor exact hetzelfde ceo:heeftVerblijfsobject (bijvoorbeeld "
+                    "ligplaatsen en standplaatsen met meerdere nummeringsvarianten "
+                    "op één object, zoals \"Bogaardenstraat 1 M 09\" en "
+                    "\"Bogaardenstraat 1 M 08\" voor dezelfde verblijfsobject-URI). "
+                    "DISTINCT op de BAGRelatie-node alleen is dus niet voldoende om "
+                    "dubbeltellingen te voorkomen. Dedupliceer op "
+                    "ceo:heeftVerblijfsobject (de URI, of het laatste padsegment als "
+                    "ID), niet op ceo:volledigAdres of op de BAGRelatie-node. "
+                    "Bevestigd: rijksmonumentnummer 26722 (CHO 10001) leverde 11 "
+                    "verschillende volledigAdres-waarden op voor precies 1 unieke "
+                    "heeftVerblijfsobject-URI."
+                ),
+            },
+        ],
+    },
+    "rest_api_wrappers": {
+        "title": "Vaste REST-queries versus zelf geschreven SPARQL",
+        "description": (
+            "Naast het rechtstreeks bevragen van het SPARQL-endpoint (via "
+            "query_sparql) bestaan er ook vaste, opgeslagen queries die als "
+            "REST-eindpunt worden aangeboden, bijvoorbeeld "
+            "https://api.linkeddata.cultureelerfgoed.nl/queries/rce/"
+            "rest-api-rijksmonumenten/run. Deze zijn handig voor snelle lookups "
+            "maar hebben een vaste queryvorm die niet met validate_query() te "
+            "controleren is, omdat de gebruiker de SPARQL zelf niet ziet of "
+            "aanpast."
+        ),
+        "patterns": [
+            {
+                "name": "Eén-op-veel wordt onterecht één-op-één",
+                "path": [
+                    "n.v.t. (vaste REST-query, geen zelf geschreven SPARQL-pad)",
+                ],
+                "guidance": (
+                    "De 'rest-api-rijksmonumenten'-REST-query retourneert altijd "
+                    "maximaal 1 BAGRelatie per rijksmonument, ook wanneer een "
+                    "monument er meerdere heeft (bijvoorbeeld een pand met meerdere "
+                    "huisnummers, zoals rijksmonumentnummer 99 met 5 adressen: "
+                    "Oudezijds Achterburgwal 82A t/m E in Amsterdam). Dit wordt niet "
+                    "als fout gemeld; de aanroeper krijgt gewoon 1 resultaat en kan "
+                    "onterecht aannemen dat dat het enige adres is. Gebruik voor "
+                    "volledigheid altijd query_sparql() met een expliciete "
+                    "DISTINCT-aanpak (zie semantics_describe_topic('addresses')) in "
+                    "plaats van deze REST-wrapper, tenzij zekerheid over "
+                    "volledigheid niet relevant is voor de vraag."
+                ),
+            },
         ],
     },
     "geometry": {
@@ -274,6 +330,32 @@ SEMANTIC_TOPICS = {
                     "om polygonen op te halen. Het WKT-formaat is een POLYGON in WGS84. "
                     "Ruimtelijke joins (welke monumenten liggen binnen een stadsgezicht-polygoon) "
                     "moeten lokaal worden uitgevoerd met Shapely; gebruik geof:sfWithin niet."
+                ),
+            },
+            {
+                "name": "Fallback bij onvolledige adresgegevens: koppelen via PDOK Locatieserver",
+                "path": [
+                    "ceo:heeftBasisregistratieRelatie",
+                    "ceo:heeftBAGRelatie",
+                    "ceo:heeftVerblijfsobject",
+                ],
+                "guidance": (
+                    "Adresvelden op een ceo:BAGRelatie zijn niet altijd compleet: "
+                    "soms ontbreken ceo:openbareRuimte en/of ceo:postcode, en bevat "
+                    "ceo:huisnummer een niet-standaard notatie (bijvoorbeeld "
+                    "\"82 C\" of \"1 M 09\"). Zelf een adresstring samenstellen uit "
+                    "de losse velden en die vervolgens laten geocoderen is "
+                    "onbetrouwbaar. Betrouwbaarder alternatief: gebruik het laatste "
+                    "padsegment van ceo:heeftVerblijfsobject (de numerieke "
+                    "BAG-verblijfsobject-ID) rechtstreeks bij PDOK Locatieserver via "
+                    "een fq-filter op het veld adresseerbaarobject_id (bijv. "
+                    "https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?q=*&"
+                    "fq=adresseerbaarobject_id:{id}). Dat geeft een exacte match "
+                    "met coördinaten (centroide_rd/centroide_ll) en een correct "
+                    "opgemaakt weergavenaam-adres, ongeacht hoe onvolledig de "
+                    "RCE-zijde is. Dit is een externe bron (PDOK), niet het RCE "
+                    "CHO-endpoint zelf, dus vereist een aparte HTTP-aanroep na de "
+                    "SPARQL-query."
                 ),
             },
         ],
