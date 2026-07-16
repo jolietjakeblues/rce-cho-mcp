@@ -53,12 +53,30 @@ SEMANTIC_TOPICS = {
                     "voorbeschermd",
                     "geen rijksmonument",
                 ],
+                "known_values_betekenis": {
+                    "rijksmonument": "actief, nu beschermd",
+                    "voorbeschermd": (
+                        "tijdelijke bescherming, nog geen definitief besluit, "
+                        "dus nog geen rijksmonument"
+                    ),
+                    "geen rijksmonument": (
+                        "afgevoerd. Ooit rijksmonument (of in behandeling) "
+                        "geweest, nu zonder status"
+                    ),
+                },
+                "graph": "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
                 "guidance": (
                     "Gebruik dit pad voor vragen over actieve rijksmonumenten of "
                     "juridische status. 'Rijksmonument' is hier een juridische "
                     "statuswaarde, geen OWMS-concept. Gebruik dus niet "
                     "resolve_concept_label('rijksmonument', graph_name='owms'). "
-                    "Gebruik hiervoor ook niet ceo:registergegeven."
+                    "Gebruik hiervoor ook niet ceo:registergegeven. Gebruik de "
+                    "graph 'instanties-rce' "
+                    "(https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce) "
+                    "voor rijksmonument-vragen -- dit is de graph met de actuele, "
+                    "levende instantiedata. Query's zonder expliciete "
+                    "GRAPH-restrictie op deze graph riskeren dubbeltellingen "
+                    "(meerdere identieke triples per object)."
                 ),
             },
         ],
@@ -80,10 +98,19 @@ SEMANTIC_TOPICS = {
                     "archeologisch",
                     "onroerend gebouwd",
                 ],
+                "graph": "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
                 "guidance": (
                     "Gebruik dit pad bij vragen over gebouwde of archeologische "
                     "rijksmonumenten. 'Archeologisch' is monumentaard, geen functie "
-                    "en geen OWMS-concept."
+                    "en geen OWMS-concept. Gebruik de graph 'instanties-rce' "
+                    "(https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce): "
+                    "alle heeftMonumentAard-triples leven in deze ene graph. Val "
+                    "op: een query zonder GRAPH-restrictie én zonder "
+                    "COUNT(DISTINCT ?cho) telt objecten dubbel, omdat elk object "
+                    "meerdere identieke rdf:type/kenmerk-triples heeft. Reken "
+                    "bijvoorbeeld op 1499 archeologische rijksmonumenten (1492 met "
+                    "puntcoordinaten), niet op de 2963 die een naieve COUNT(?cho) "
+                    "oplevert."
                 ),
             },
         ],
@@ -298,13 +325,17 @@ SEMANTIC_TOPICS = {
             {
                 "name": "Puntgeometrie (WKT)",
                 "path": [
-                    "geo:hasGeometry",
+                    "ceo:heeftGeometrie",
                     "geo:asWKT",
                 ],
                 "guidance": (
                     "Gebruik dit pad om de locatie van een monument als WKT op te halen. "
                     "Het resultaat is een POINT-waarde in WGS84 (lon lat), bijvoorbeeld "
                     "POINT(4.9041 52.3676). Geen conversie nodig voor Leaflet of GeoJSON. "
+                    "Let op: gebruik ceo:heeftGeometrie, niet geo:hasGeometry -- dat laatste "
+                    "is wel de rdfs:subPropertyOf in de ontologie, maar komt in de live data "
+                    "0 keer voor en geeft dus stil 0 resultaten zonder foutmelding. "
+                    "ceo:heeftGeometrie heeft 241.605 triples. "
                     "Geometrieën staan in de graph 'punten' of 'instanties-rce'. "
                     "Voeg PREFIX geo: <http://www.opengis.net/ont/geosparql#> toe aan de query. "
                     "Gebruik geen geof:sfWithin of andere GeoSPARQL-relaties voor ruimtelijke "
@@ -320,7 +351,7 @@ SEMANTIC_TOPICS = {
             {
                 "name": "Polygoongeometrie (beschermd stadsgezicht)",
                 "path": [
-                    "geo:hasGeometry",
+                    "ceo:heeftGeometrie",
                     "geo:asWKT",
                 ],
                 "guidance": (

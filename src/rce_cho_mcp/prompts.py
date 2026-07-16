@@ -144,6 +144,15 @@ Ontwerpregels:
   dezelfde BRK-relatie op één monument). Dedupliceer verzamel-resultaten
   (tellingen, lijsten) altijd met DISTINCT of in code, anders vertekent dit
   het resultaat.
+- Dit dubbeltellingsrisico geldt breed voor de RCE CHO-dataset: rdf:type,
+  ceo:heeftJuridischeStatus, ceo:heeftMonumentAard en ceo:heeftGeometrie
+  komen vaak 2x per object voor. Gebruik voor rijksmonument-vragen altijd de
+  graph 'instanties-rce'
+  (https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce, de actuele,
+  levende instantiedata) met een expliciete GRAPH-restrictie, en gebruik bij
+  tellingen COUNT(DISTINCT ?cho) i.p.v. COUNT(?cho) -- zonder één van beide
+  is een uitkomst al snel ~2x te hoog (bevestigd: 1499 archeologische
+  rijksmonumenten, niet 2963 via een naieve COUNT(?cho)).
 - Neem bij een nieuw soort adres- of identificatie-vraag niet aan dat een
   patroon dat bij één voorbeeldobject werkte, ook voor alle andere objecten
   geldt. Test met minimaal 2-3 verschillende objecten (bij voorkeur uit
