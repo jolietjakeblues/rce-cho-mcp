@@ -116,6 +116,11 @@ SEMANTIC_TOPICS = {
                         "geweest, nu zonder status"
                     ),
                 },
+                "known_value_uris": {
+                    "rijksmonument": "https://data.cultureelerfgoed.nl/term/id/rn/2/b2d9a59a-fe1e-4552-9a05-3c2acddff864",
+                    "voorbeschermd": "https://data.cultureelerfgoed.nl/term/id/rn/2/2e93edd1-098f-4f31-ae7e-72cb77f4d2ca",
+                    "geen rijksmonument": "https://data.cultureelerfgoed.nl/term/id/rn/2/3e79bb7c-b459-4998-a9ed-78d91d069227",
+                },
                 "graph": "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
                 "guidance": (
                     "Gebruik dit pad voor vragen over actieve rijksmonumenten of "
@@ -128,7 +133,13 @@ SEMANTIC_TOPICS = {
                     "voor rijksmonument-vragen -- dit is de graph met de actuele, "
                     "levende instantiedata. Query's zonder expliciete "
                     "GRAPH-restrictie op deze graph riskeren dubbeltellingen "
-                    "(meerdere identieke triples per object)."
+                    "(meerdere identieke triples per object). Filter bij voorkeur "
+                    "direct op de concept-URI (ceo:heeftJuridischeStatus "
+                    "<...b2d9a59a-fe1e-4552-9a05-3c2acddff864> voor 'rijksmonument', "
+                    "zie known_value_uris) in plaats van op skos:prefLabel-tekst -- "
+                    "dat is sneller en vermijdt taalstring-issues. Deze drie "
+                    "concept-URI's zijn geverifieerd tegen de live dataset (bron: "
+                    "RCE-query 'Tellen van Verschillende Instanties in de Graph')."
                 ),
             },
         ],
@@ -150,6 +161,9 @@ SEMANTIC_TOPICS = {
                     "archeologisch",
                     "onroerend gebouwd",
                 ],
+                "known_value_uris": {
+                    "archeologisch": "https://data.cultureelerfgoed.nl/term/id/rn/2/b673c8c1-5d93-496d-8f9e-89133d579d77",
+                },
                 "graph": "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
                 "guidance": (
                     "Gebruik dit pad bij vragen over gebouwde of archeologische "
@@ -162,7 +176,11 @@ SEMANTIC_TOPICS = {
                     "meerdere identieke rdf:type/kenmerk-triples heeft. Reken "
                     "bijvoorbeeld op 1499 archeologische rijksmonumenten (1492 met "
                     "puntcoordinaten), niet op de 2963 die een naieve COUNT(?cho) "
-                    "oplevert."
+                    "oplevert. Filter bij voorkeur direct op de concept-URI "
+                    "(ceo:heeftMonumentAard <...b673c8c1-5d93-496d-8f9e-89133d579d77> "
+                    "voor 'archeologisch') in plaats van op skos:prefLabel-tekst -- "
+                    "geverifieerd tegen de live dataset, geen taalstring nodig "
+                    "(dit concept heeft geen lang-tag op zijn prefLabel)."
                 ),
             },
         ],
@@ -251,7 +269,11 @@ SEMANTIC_TOPICS = {
                     "altijd met aanhalingstekens (ceo:rijksmonumentnummer \"2\"), nooit "
                     "met een kaal getal. Dit is de meest directe sleutel om een specifiek "
                     "rijksmonument op te zoeken -- gebruik dit pad voor 'zoek monument "
-                    "nummer X' in plaats van te filteren op naam of omschrijving."
+                    "nummer X' in plaats van te filteren op naam of omschrijving. Voor een "
+                    "klikbare link naar het officiele register: BIND(URI(CONCAT("
+                    "\"https://monumentenregister.cultureelerfgoed.nl/monumenten/\", "
+                    "?rijksmonumentnummer)) AS ?link) -- patroon uit RCE's eigen "
+                    "voorbeeldquery's, handig bij presentatie van resultaten."
                 ),
             },
             {
