@@ -195,8 +195,8 @@ def _is_rd(x: float, y: float) -> bool:
 _WKT_STRIP = re.compile(r"\^\^<[^>]+>$")
 
 _POINT_RE = re.compile(r"^POINT\s*\(\s*([0-9.eE+-]+)\s+([0-9.eE+-]+)\s*\)$", re.IGNORECASE)
-_POLYGON_RE = re.compile(r"^POLYGON\s*\(\((.+)\)\)$", re.IGNORECASE | re.DOTALL)
-_MULTIPOLYGON_RE = re.compile(r"^MULTIPOLYGON\s*\(\((.+)\)\)$", re.IGNORECASE | re.DOTALL)
+_POLYGON_RE = re.compile(r"^POLYGON\s*\((.+)\)$", re.IGNORECASE | re.DOTALL)
+_MULTIPOLYGON_RE = re.compile(r"^MULTIPOLYGON\s*\((.+)\)$", re.IGNORECASE | re.DOTALL)
 
 
 def _parse_coord_pair(pair: str) -> list[float]:
@@ -208,8 +208,54 @@ def _parse_ring(ring_str: str) -> list[list[float]]:
     return [_parse_coord_pair(p) for p in ring_str.strip().split(",")]
 
 
+def _split_top_level(text: str) -> list[str]:
+    """Split text on commas that sit outside any parentheses.
+
+    Used to separate sibling rings/polygons in WKT (e.g. an exterior ring
+    from its holes, or one polygon from the next in a MULTIPOLYGON) without
+    also splitting on the commas between coordinate pairs inside a ring,
+    which sit one paren level deeper.
+    """
+    parts = []
+    depth = 0
+    start = 0
+
+    for i, ch in enumerate(text):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            parts.append(text[start:i])
+            start = i + 1
+
+    parts.append(text[start:])
+    return [p.strip() for p in parts]
+
+
+def _strip_parens(text: str) -> str:
+    text = text.strip()
+    if text.startswith("(") and text.endswith(")"):
+        return text[1:-1].strip()
+    return text
+
+
+def _parse_polygon_rings(rings_text: str) -> list[list[list[float]]]:
+    """Parse a POLYGON's ring list, e.g. "(ext ring), (hole ring), ...".
+
+    The first ring is the exterior ring, any further rings are holes --
+    this is exactly GeoJSON's Polygon coordinates convention, so the
+    result can be used as-is for both a standalone Polygon and one
+    polygon within a MultiPolygon.
+    """
+    return [_parse_ring(_strip_parens(r)) for r in _split_top_level(rings_text)]
+
+
 def wkt_to_geometry(wkt: str, convert_rd: bool = False) -> dict | None:
     """Parse a WKT string to a GeoJSON geometry dict. Returns None on failure.
+
+    Supports POINT, POLYGON and MULTIPOLYGON, including interior rings
+    (holes) on POLYGON/MULTIPOLYGON.
 
     convert_rd: when True, coordinates detected as RD (EPSG:28992) are
     automatically converted to WGS84 before building the geometry.
@@ -230,17 +276,20 @@ def wkt_to_geometry(wkt: str, convert_rd: bool = False) -> dict | None:
 
     m = _POLYGON_RE.match(wkt)
     if m:
-        ring = _parse_ring(m.group(1))
-        if convert_rd and ring and _is_rd(*ring[0]):
-            ring = [list(rd_to_wgs84(p[0], p[1])) for p in ring]
-        return {"type": "Polygon", "coordinates": [ring]}
+        rings = _parse_polygon_rings(m.group(1))
+        if convert_rd and rings and rings[0] and _is_rd(*rings[0][0]):
+            rings = [[list(rd_to_wgs84(p[0], p[1])) for p in ring] for ring in rings]
+        return {"type": "Polygon", "coordinates": rings}
 
     m = _MULTIPOLYGON_RE.match(wkt)
     if m:
-        rings = [_parse_ring(r) for r in re.split(r"\)\s*,\s*\(", m.group(1))]
-        if convert_rd and rings and rings[0] and _is_rd(*rings[0][0]):
-            rings = [[list(rd_to_wgs84(p[0], p[1])) for p in ring] for ring in rings]
-        return {"type": "MultiPolygon", "coordinates": [[ring] for ring in rings]}
+        polygons = [_parse_polygon_rings(_strip_parens(p)) for p in _split_top_level(m.group(1))]
+        if convert_rd and polygons and polygons[0] and polygons[0][0]:
+            polygons = [
+                [[list(rd_to_wgs84(pt[0], pt[1])) for pt in ring] for ring in polygon]
+                for polygon in polygons
+            ]
+        return {"type": "MultiPolygon", "coordinates": polygons}
 
     return None
 

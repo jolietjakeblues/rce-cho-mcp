@@ -42,22 +42,33 @@ def get_properties() -> dict[str, str]:
     return dict(sorted(properties.items()))
 
 
-def get_label(uri: str) -> str | None:
+def _preferred_literal(uri: str, predicate, preferred_lang: str = "nl") -> str | None:
+    """Return one literal for (uri, predicate, ?), preferring preferred_lang.
+
+    The ontology declares both @nl and @en variants for most labels/comments.
+    rdflib's iteration order over multiple objects for the same predicate is
+    not something to rely on for language selection, even though it happens
+    to follow file order (@nl first) in practice -- this makes the preference
+    explicit instead.
+    """
     graph = load_ontology()
+    fallback = None
 
-    for label in graph.objects(URIRef(uri), RDFS.label):
-        return str(label)
+    for value in graph.objects(URIRef(uri), predicate):
+        if getattr(value, "language", None) == preferred_lang:
+            return str(value)
+        if fallback is None:
+            fallback = value
 
-    return None
+    return str(fallback) if fallback is not None else None
+
+
+def get_label(uri: str) -> str | None:
+    return _preferred_literal(uri, RDFS.label)
 
 
 def get_comment(uri: str) -> str | None:
-    graph = load_ontology()
-
-    for comment in graph.objects(URIRef(uri), RDFS.comment):
-        return str(comment)
-
-    return None
+    return _preferred_literal(uri, RDFS.comment)
 
 
 def get_properties_for_class(class_name: str) -> dict[str, str]:
