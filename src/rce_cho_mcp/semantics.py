@@ -212,9 +212,35 @@ SEMANTIC_TOPICS = {
         "description": (
             "Gebruik dit topic voordat je filtert op een registernummer, huisnummer "
             "of perceelnummer: deze velden zijn stuk voor stuk xsd:string, geen "
-            "xsd:integer, ook wanneer de waarde er als getal uitziet."
+            "xsd:integer, ook wanneer de waarde er als getal uitziet. Gebruik "
+            "ceo:cultuurhistorischObjectnummer (CHOI) als je tussen domeinspecifieke "
+            "nummers (rijksmonumentnummer, complexnummer, werelderfgoednummer, "
+            "archis2-nummers) heen en weer wilt vertalen."
         ),
         "patterns": [
+            {
+                "name": "CHOI (Cultuurhistorisch Object Identificatienummer)",
+                "path": ["ceo:cultuurhistorischObjectnummer"],
+                "guidance": (
+                    "ceo:cultuurhistorischObjectnummer is het CHOI-nummer: RCE's "
+                    "domeinonafhankelijke centrale index over alle erfgoeddomeinen "
+                    "heen (gebouwd erfgoed, archeologie, landschap, roerend erfgoed). "
+                    "Elk CHO heeft precies één CHOI, naast zijn eventuele "
+                    "domeinspecifieke nummer (rijksmonumentnummer, complexnummer, "
+                    "werelderfgoednummer, archis2*-nummers) op dezelfde node. Gebruik "
+                    "dit pad om tussen die domeinspecifieke nummers te vertalen -- bv. "
+                    "'welk rijksmonumentnummer hoort bij CHO-nummer X' -- door beide "
+                    "properties op hetzelfde subject op te halen: ?cho a ceo:Rijksmonument ; "
+                    "ceo:cultuurhistorischObjectnummer ?choi ; ceo:rijksmonumentnummer "
+                    "?rmnr . Empirisch veruit de breedst gevulde identifier in de "
+                    "dataset (1.204.320 triples, ruim vier keer zo veel als "
+                    "rijksmonumentnummer) omdat hij op vrijwel elk CHO-type voorkomt, "
+                    "niet alleen op ceo:Rijksmonument. Bron: RCE-story "
+                    "'CHO en CHOI als ruggengraat' en de bijbehorende query "
+                    "'Het rijksmonumentnummer van een CHO uuid'. xsd:string, altijd "
+                    "gequote filteren, net als de andere nummers in dit topic."
+                ),
+            },
             {
                 "name": "Rijksmonumentnummer",
                 "path": ["ceo:rijksmonumentnummer"],
