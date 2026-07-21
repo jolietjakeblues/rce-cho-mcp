@@ -103,6 +103,7 @@ Huidige topics:
 - `addresses`
 - `rest_api_wrappers`
 - `geometry`
+- `archaeology`
 
 Belangrijke patronen:
 
