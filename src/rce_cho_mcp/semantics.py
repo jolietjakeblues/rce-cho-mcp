@@ -33,6 +33,58 @@ SEMANTIC_TOPICS = {
                     "voor overheidstermen zoals gemeenten en provincies."
                 ),
             },
+            {
+                "name": "Type (via heeftType)",
+                "path": [
+                    "ceo:heeftType",
+                    "ceo:heeftTypeNaam",
+                    "skos:prefLabel",
+                ],
+                "guidance": (
+                    "ceo:heeftType wijst direct van het cultuurhistorisch object naar "
+                    "een ceo:Type-node; die node heeft ceo:heeftTypeNaam -> "
+                    "skos:prefLabel (FILTER(lang(...)=\"nl\")). Empirisch een van de "
+                    "best gevulde paden in de dataset (ceo:heeftTypeNaam: 907.767 "
+                    "triples, breed over veel classes, niet alleen Rijksmonument) -- "
+                    "gebruik dit als derde kandidaat naast oorspronkelijke en huidige "
+                    "functie, bijvoorbeeld bij bouwtype of objecttype dat niet via "
+                    "functiepaden te vinden is. ceo:heeftKennisregistratie leidt naar "
+                    "dezelfde ceo:Type-node (identiek aantal triples in een steekproef "
+                    "op ceo:Rijksmonument); heeftType is het directe, kortere pad."
+                ),
+            },
+            {
+                "name": "Combinatiezoekpad met betrouwbaarheidsmarkering (UNION)",
+                "path": [
+                    "ceo:heeftOorspronkelijkeFunctie",
+                    "ceo:heeftHuidigeFunctie",
+                    "ceo:heeftType",
+                    "ceo:heeftOmschrijving",
+                ],
+                "guidance": (
+                    "Voor vrije zoektermen als 'kerk', 'molen', 'kasteel' -- waarbij "
+                    "onduidelijk is via welk pad de term voorkomt -- combineer "
+                    "oorspronkelijke functie, huidige functie en type in een UNION, "
+                    "met omschrijving als laatste vangnet, en label elke tak met een "
+                    "?bron-kolom zodat de betrouwbaarheid zichtbaar blijft:\n"
+                    "{ ?rm ceo:heeftOorspronkelijkeFunctie ?fObj . ?fObj ceo:heeftFunctieNaam ?fC . "
+                    "?fC skos:prefLabel ?fNaam . FILTER(lang(?fNaam)=\"nl\") "
+                    "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) BIND(\"oorspronkelijke functie\" AS ?bron) } "
+                    "UNION { ?rm ceo:heeftHuidigeFunctie ?fObj . ?fObj ceo:heeftFunctieNaam ?fC . "
+                    "?fC skos:prefLabel ?fNaam . FILTER(lang(?fNaam)=\"nl\") "
+                    "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) BIND(\"huidige functie\" AS ?bron) } "
+                    "UNION { ?rm ceo:heeftType ?typeObj . ?typeObj ceo:heeftTypeNaam ?typeC . "
+                    "?typeC skos:prefLabel ?fNaam . FILTER(lang(?fNaam)=\"nl\") "
+                    "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) BIND(\"type\" AS ?bron) } "
+                    "UNION { ?rm ceo:heeftOmschrijving ?oObj . ?oObj ceo:omschrijving ?fNaam . "
+                    "FILTER(REGEX(LCASE(?fNaam), \"(^|\\\\W)kerk(\\\\W|$)\")) "
+                    "BIND(\"omschrijving (onzeker)\" AS ?bron) }.\n"
+                    "Selecteer ?bron altijd mee in SELECT DISTINCT. Rijen met "
+                    "?bron = 'omschrijving (onzeker)' zijn minder betrouwbaar omdat "
+                    "ze op vrije tekst berusten -- toon of behandel ze apart. Zoek "
+                    "nooit los in ceo:omschrijving zonder deze markering."
+                ),
+            },
         ],
     },
     "legal_status": {
@@ -387,6 +439,85 @@ SEMANTIC_TOPICS = {
                     "RCE-zijde is. Dit is een externe bron (PDOK), niet het RCE "
                     "CHO-endpoint zelf, dus vereist een aparte HTTP-aanroep na de "
                     "SPARQL-query."
+                ),
+            },
+        ],
+    },
+    "archaeology": {
+        "title": "Archeologische objecten",
+        "description": (
+            "Gebruik dit topic voor vragen over archeologische terreinen, "
+            "onderzoeksgebieden, complexen, vondstlocaties, grondsporen en "
+            "vondsten. Dit zijn aparte classes naast ceo:Rijksmonument, "
+            "onderling verbonden via ceo:bevatObject / ceo:ligtInObject."
+        ),
+        "patterns": [
+            {
+                "name": "Containment-netwerk (bevatObject / ligtInObject)",
+                "path": ["ceo:bevatObject"],
+                "guidance": (
+                    "ceo:bevatObject en zijn inverse ceo:ligtInObject (samen 938.756 "
+                    "triples, exact gelijk aantal in beide richtingen) verbinden "
+                    "archeologische classes in een netwerk, geen strikte boom -- "
+                    "dezelfde class kan via meerdere bovenliggende classes gevuld "
+                    "worden. Empirisch voorkomende combinaties (aantal triples): "
+                    "ceo:Rijksmonument bevatObject ceo:ArcheologischTerrein (3.665); "
+                    "ceo:ArcheologischTerrein bevatObject ceo:ArcheologischComplex (18.548); "
+                    "ceo:ArcheologischOnderzoeksgebied bevatObject ceo:ArcheologischComplex (9.362); "
+                    "ceo:ArcheologischOnderzoeksgebied bevatObject ceo:Vondstlocatie (40.005); "
+                    "ceo:Vondstlocatie bevatObject ceo:ArcheologischComplex (332.327); "
+                    "ceo:Vondstlocatie bevatObject ceo:Grondsporen (91.832); "
+                    "ceo:Vondstlocatie bevatObject ceo:Vondsten (444.867). "
+                    "Gebruik ceo:ligtInObject om vanuit het kleinere object omhoog te "
+                    "navigeren (bv. vanaf een Vondsten-object terug naar de "
+                    "Vondstlocatie) -- dit is dezelfde relatie in omgekeerde richting, "
+                    "geen apart pad met eigen betekenis. Ga niet uit van een vaste "
+                    "diepte: een ceo:ArcheologischComplex kan direct onder een "
+                    "ArcheologischTerrein, een ArcheologischOnderzoeksgebied of een "
+                    "Vondstlocatie hangen, dus verken eerst welke combinatie relevant "
+                    "is voordat je een vast pad aanneemt."
+                ),
+            },
+            {
+                "name": "Archis2-identificatienummers",
+                "path": ["ceo:archis2Monumentnummer"],
+                "guidance": (
+                    "Archis2-nummers zijn xsd:string -- filter altijd met "
+                    "aanhalingstekens. Elk nummer hoort bij een specifieke class "
+                    "(rdfs:domain): ceo:archis2Monumentnummer -> ceo:ArcheologischTerrein "
+                    "(13.025 triples); ceo:archis2Complexnummer -> "
+                    "ceo:ArcheologischComplex of ceo:Vondstlocatie (18.588); "
+                    "ceo:archis2Vondstmeldingsnummer -> ceo:Vondstlocatie (41.514); "
+                    "ceo:archis2Waarnemingsnummer -> ceo:Vondstlocatie (88.649); "
+                    "ceo:archis2Vondstnummer -> ceo:Grondsporen of ceo:Vondsten "
+                    "(321.634, identificeert de individuele vondst/het grondspoor, "
+                    "niet de vondstlocatie). Daarnaast heeft vrijwel elke "
+                    "archeologische class ook ceo:cultuurhistorischObjectnummer als "
+                    "generieke identifier."
+                ),
+            },
+            {
+                "name": "Aantallen op Grondsporen en Vondsten",
+                "path": ["ceo:bevatObject", "ceo:aantalVondsten"],
+                "guidance": (
+                    "ceo:Grondsporen heeft ceo:aantalGrondsporen, ceo:Vondsten heeft "
+                    "ceo:aantalVondsten -- beide hangen via ceo:bevatObject onder een "
+                    "ceo:Vondstlocatie. Voorbeeld voor 'welke vindplaats heeft de "
+                    "meeste vondsten': SELECT DISTINCT ?locatie ?naam ?aantal WHERE { "
+                    "?locatie a ceo:Vondstlocatie . ?locatie ceo:bevatObject ?vondstObj . "
+                    "?vondstObj a ceo:Vondsten . ?vondstObj ceo:aantalVondsten ?aantal . "
+                    "OPTIONAL { ?locatie ceo:heeftLocatieAanduiding ?locObj . "
+                    "?locObj ceo:locatienaam ?naam . } } ORDER BY DESC(?aantal) LIMIT 20"
+                ),
+            },
+            {
+                "name": "Naam van een vondstlocatie",
+                "path": ["ceo:heeftLocatieAanduiding", "ceo:locatienaam"],
+                "guidance": (
+                    "Vondstlocaties (en andere archeologische classes) hebben geen "
+                    "ceo:heeftNaam zoals Rijksmonument, maar "
+                    "ceo:heeftLocatieAanduiding -> ceo:locatienaam. Gebruik dit pad "
+                    "niet voor ceo:Rijksmonument zelf."
                 ),
             },
         ],
