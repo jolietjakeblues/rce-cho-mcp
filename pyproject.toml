@@ -7,42 +7,42 @@ requires-python = ">=3.11"
 license = { text = "EUPL-1.2" }
 
 authors = [
-{ name = "Joop" }
+  { name = "Joop" }
 ]
 
 keywords = [
-"mcp",
-"model-context-protocol",
-"linked-data",
-"sparql",
-"rdf",
-"skos",
-"rce",
-"cultural-heritage"
+  "mcp",
+  "model-context-protocol",
+  "linked-data",
+  "sparql",
+  "rdf",
+  "skos",
+  "rce",
+  "cultural-heritage"
 ]
 
 classifiers = [
-"Development Status :: 4 - Beta",
-"Intended Audience :: Developers",
-"License :: OSI Approved :: European Union Public Licence 1.2 (EUPL 1.2)",
-"Programming Language :: Python :: 3",
-"Programming Language :: Python :: 3.11",
-"Programming Language :: Python :: 3.12",
-"Programming Language :: Python :: 3.13",
-"Programming Language :: Python :: 3.14",
-"Topic :: Software Development :: Libraries :: Python Modules"
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: European Union Public Licence 1.2 (EUPL 1.2)",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules"
 ]
 
 dependencies = [
-"mcp>=1.0.0",
-"rdflib>=7.0.0"
+  "mcp>=1.27,<2",
+  "rdflib>=7.0.0,<8"
 ]
 
 [project.optional-dependencies]
 dev = [
-"pytest>=9.0",
-"pytest-asyncio>=1.0",
-"ruff>=0.12"
+  "pytest>=9.0",
+  "pytest-asyncio>=1.0",
+  "ruff>=0.12"
 ]
 
 [project.scripts]
@@ -70,9 +70,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = [
-"E",
-"F",
-"I",
-"UP",
-"B"
+  "E",
+  "F",
+  "I",
+  "UP",
+  "B"
 ]
