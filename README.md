@@ -337,3 +337,10 @@ The MCP exposes capabilities, not workflows. The client decides how ontology dis
 This project is released under the EUPL-1.2 (European Union Public Licence, version 1.2).
 
 In short: you may freely use, modify and distribute the code. If you distribute or publicly offer a derivative work, it must remain available under the EUPL or a compatible copyleft licence. The full licence text is in the `LICENSE` file in this repository, and is officially available in all EU languages via the European Commission.
+
+---
+
+*"The future is unwritten."*  
+— Joe Strummer
+
+---
