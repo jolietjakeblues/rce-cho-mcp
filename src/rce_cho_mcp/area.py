@@ -54,6 +54,16 @@ _QUERY_TIMEOUT = 60
 _MIN_LIMIT = 1
 _MAX_LIMIT = 100
 
+# Zie semantics_describe_topic('monument_aard'): ceo:heeftMonumentAard kent
+# precies deze twee waarden. Hier herbruikt zodat "grootste archeologische
+# monumenten qua oppervlakte" in 1 tool call kan, zonder ooit ruwe WKT naar de
+# aanroeper te sturen (zie query_sparql's docstring voor waarom dat bij
+# grotere aantallen de tool-resultaatlimiet raakt).
+_MONUMENT_AARD_URIS = {
+    "archeologisch": "https://data.cultureelerfgoed.nl/term/id/rn/2/b673c8c1-5d93-496d-8f9e-89133d579d77",
+    "onroerend gebouwd": "https://data.cultureelerfgoed.nl/term/id/rn/2/fc966a68-8863-4970-a83e-110f96006c21",
+}
+
 
 def _clamp_limit(limit: int) -> int:
     return max(_MIN_LIMIT, min(limit, _MAX_LIMIT))
@@ -66,12 +76,19 @@ def _resolve_class_uri(class_name: str) -> str | None:
     return get_classes().get(class_name)
 
 
-def largest_by_area(limit: int = 10, class_name: str = _DEFAULT_CLASS) -> dict:
+def largest_by_area(
+    limit: int = 10, class_name: str = _DEFAULT_CLASS, monument_aard: str | None = None
+) -> dict:
     """Zoek de monumenten met de grootste polygoon-oppervlakte in de live dataset.
 
-    Retourneert {"class_name", "class_uri", "limit", "rows": [...]} of
-    {"error": ...} als class_name onbekend is. Elke rij in "rows" heeft
-    "rm" (URI), "oppervlakte_m2" (float), "naam" (str|None) en
+    monument_aard: optioneel, "archeologisch" of "onroerend gebouwd" (zie
+    semantics_describe_topic('monument_aard')) om te filteren op
+    ceo:heeftMonumentAard. Alleen zinvol in combinatie met class_name
+    "Rijksmonument" (het enige domain van deze property).
+
+    Retourneert {"class_name", "class_uri", "limit", "monument_aard", "rows": [...]}
+    of {"error": ...} bij een onbekende class_name/monument_aard. Elke rij in
+    "rows" heeft "rm" (URI), "oppervlakte_m2" (float), "naam" (str|None) en
     "rijksmonumentnummer" (str|None).
     """
     limit = _clamp_limit(limit)
@@ -82,6 +99,16 @@ def largest_by_area(limit: int = 10, class_name: str = _DEFAULT_CLASS) -> dict:
             "error": f"Onbekende class: {class_name}",
             "beschikbare_classes_voorbeeld": sorted(get_classes().keys())[:50],
         }
+
+    monument_aard_filter = ""
+    if monument_aard is not None:
+        aard_uri = _MONUMENT_AARD_URIS.get(monument_aard)
+        if aard_uri is None:
+            return {
+                "error": f"Onbekende monument_aard: {monument_aard!r}",
+                "beschikbare_monument_aard_waarden": sorted(_MONUMENT_AARD_URIS.keys()),
+            }
+        monument_aard_filter = f"?rm ceo:heeftMonumentAard <{aard_uri}> ."
 
     query = f"""
 PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
@@ -94,6 +121,7 @@ SELECT DISTINCT ?rm ?opp ?naam ?rijksmonumentnummer WHERE {{
     WHERE {{
       GRAPH <{_INSTANTIES_GRAPH}> {{
         ?rm a <{class_uri}> ; ceo:heeftGeometrie ?geomObj .
+        {monument_aard_filter}
       }}
       ?geomObj geo:asWKT ?wkt .
       FILTER(REGEX(STR(?wkt), "^\\\\s*(multi)?polygon", "i"))
@@ -123,25 +151,31 @@ ORDER BY DESC(?opp)
         "class_name": class_name,
         "class_uri": class_uri,
         "limit": limit,
+        "monument_aard": monument_aard,
         "rows": rows,
     }
 
 
 def format_largest_by_area(result: dict) -> str:
     if "error" in result:
-        available = ", ".join(result["beschikbare_classes_voorbeeld"])
-        return f"{result['error']}\n\nEerste beschikbare classes:\n{available}"
+        available = ", ".join(
+            result.get("beschikbare_classes_voorbeeld")
+            or result.get("beschikbare_monument_aard_waarden")
+            or []
+        )
+        return f"{result['error']}\n\nBeschikbaar:\n{available}"
 
     rows = result["rows"]
+    aard_suffix = f" (monumentaard: {result['monument_aard']})" if result["monument_aard"] else ""
     if not rows:
         return (
             f"Geen monumenten met polygoon-/multipolygoon-geometrie gevonden "
-            f"voor class {result['class_name']} ({result['class_uri']})."
+            f"voor class {result['class_name']}{aard_suffix} ({result['class_uri']})."
         )
 
     lines = [
-        f"Top {len(rows)} grootste {result['class_name']}(s) qua oppervlakte "
-        "(alleen monumenten met polygoon-/multipolygoon-geometrie op "
+        f"Top {len(rows)} grootste {result['class_name']}(s){aard_suffix} qua "
+        "oppervlakte (alleen monumenten met polygoon-/multipolygoon-geometrie op "
         "ceo:heeftGeometrie -- monumenten met alleen een puntgeometrie hebben "
         "geen berekenbare oppervlakte en zitten hier niet in):\n",
         "rijksmonumentnummer | naam | oppervlakte (m2) | uri",

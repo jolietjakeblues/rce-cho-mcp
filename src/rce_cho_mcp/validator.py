@@ -51,6 +51,17 @@ UNTYPED_NUMERIC_LITERAL_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Detecteert een variabele gebonden via geo:asWKT (polygoongeometrie kan
+# duizenden tekens per rij zijn -- zie _find_large_wkt_result_risk).
+WKT_BINDING_PATTERN = re.compile(r"geo:asWKT\s+\?(\w+)", re.IGNORECASE)
+LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(\d+)", re.IGNORECASE)
+
+# Gemeten 2026-09-03: 100 rijen polygoon-WKT van archeologische
+# rijksmonumenten was al >500.000 tekens en overschreed de tool-
+# resultaatlimiet ("Tool result too large"). 30 rijen is een ruime marge
+# onder die grens, ook bij complexere polygonen dan het gemeten gemiddelde.
+_SAFE_WKT_LIMIT = 30
+
 
 def _find_order_by_optional_timeout_risk(query: str) -> list[str]:
     """Detecteer ORDER BY gecombineerd met OPTIONAL-joins.
@@ -134,6 +145,50 @@ def _find_geosparql_timeout_risk(query: str) -> list[str]:
         "voer de ruimtelijke join daarna lokaal uit (bijv. met Shapely in Python). "
         "Zie ook: semantics_describe_topic('geometry')."
     ]
+
+def _find_large_wkt_result_risk(query: str) -> list[str]:
+    """Detecteer geo:asWKT geselecteerd zonder voldoende kleine LIMIT.
+
+    Polygoongeometrie is tekstueel groot. Gemeten (2026-09-03): 100 rijen
+    polygoon-WKT van archeologische rijksmonumenten was al ruim 500.000
+    tekens en overschreed de resultaatlimiet van een tool-aanroep, ook al
+    was het maar 100 rijen -- de bottleneck is hier tekstlengte per rij, niet
+    het aantal rijen. Dit treft alleen SELECT-queries; ASK-queries geven
+    sowieso maar een boolean terug.
+    """
+    wkt_vars = set(WKT_BINDING_PATTERN.findall(query))
+    if not wkt_vars:
+        return []
+
+    select_match = re.search(r"SELECT\b(.*?)\bWHERE\b", query, re.IGNORECASE | re.DOTALL)
+    if not select_match:
+        return []
+
+    select_clause = select_match.group(1)
+    selected_wkt = "*" in select_clause or any(
+        re.search(rf"\?{re.escape(var)}\b", select_clause) for var in wkt_vars
+    )
+    if not selected_wkt:
+        return []
+
+    limit_matches = LIMIT_PATTERN.findall(query)
+    limit_value = int(limit_matches[-1]) if limit_matches else None
+
+    if limit_value is not None and limit_value <= _SAFE_WKT_LIMIT:
+        return []
+
+    limit_desc = f"met LIMIT {limit_value}" if limit_value is not None else "zonder LIMIT"
+    return [
+        f"Query selecteert geo:asWKT {limit_desc}. Polygoongeometrie kan "
+        "enkele duizenden tekens per rij zijn -- 100 van zulke rijen "
+        "overschreed in test al ruim 500.000 tekens en de tool-resultaatlimiet "
+        f"('Tool result too large'). Gebruik LIMIT <= {_SAFE_WKT_LIMIT} als je "
+        "de ruwe WKT echt nodig hebt, of gebruik "
+        "grootste_monumenten_oppervlakte() als je eigenlijk de oppervlakte "
+        "wilt weten -- die berekent server-side met geof:area() en stuurt "
+        "nooit ruwe WKT terug, ongeacht het aantal monumenten."
+    ]
+
 
 def _find_groupby_overflow_risk(query: str) -> list[str]:
     """Detecteer GROUP BY met lange tekstvelden die Virtuoso niet kan verwerken."""
@@ -229,6 +284,7 @@ def validate_sparql(query: str) -> dict:
             )
 
     warnings.extend(_find_unsafe_label_filters(q))
+    warnings.extend(_find_large_wkt_result_risk(q))
     warnings.extend(_find_groupby_overflow_risk(q))
     warnings.extend(_find_geosparql_timeout_risk(q))
     warnings.extend(_find_order_by_optional_timeout_risk(q))
