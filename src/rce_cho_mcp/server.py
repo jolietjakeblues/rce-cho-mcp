@@ -384,6 +384,28 @@ def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
     fout. Gebruik resolve_concept_label() om eerst de concept-URI op te
     halen, of wrap de vergelijking in STR(). Gebruik validate_query_structured()
     om dit patroon vooraf te laten controleren.
+
+    PRAKTISCHE GRENS, belangrijk bij grote resultaatsets: max_rows beperkt
+    alleen hoeveel rijen worden GETOOND, niet hoeveel de query zelf ophaalt --
+    zet dus altijd ook een LIMIT in de SPARQL-query zelf als je een groot
+    aantal rijen verwacht. Nog belangrijker: bij brede kolommen zoals
+    geo:asWKT (polygoongeometrie) is het aantal rijen niet de bottleneck maar
+    de tekstlengte per rij. Live gemeten (2026-09-03): 100 rijen met
+    polygoon-WKT van archeologische rijksmonumenten was al ruim 500.000
+    tekens en overschreed de resultaatlimiet van deze tool-aanroep ("Tool
+    result too large"). Richtlijn: houd LIMIT op maximaal ~20-30 als de query
+    geo:asWKT (of een vergelijkbaar groot veld als ceo:omschrijving) selecteert;
+    voor smalle kolommen (alleen URI's, nummers, korte labels) kan LIMIT
+    veel hoger (100-1000+) zonder problemen -- dit endpoint heeft, anders dan
+    het Kadaster KKG-endpoint, geen hard OFFSET-limiet bij 10.000 (getest tot
+    OFFSET 60.000 zonder fout), dus gewone LIMIT/OFFSET-paginering is prima
+    bruikbaar voor bulk-scans van smalle kolommen (bv. ~62 aanroepen van
+    LIMIT 1000 voor alle ~61.500 'onroerend gebouwd'-rijksmonumenten).
+    Moet je iets over veel geometrieën tegelijk berekenen (bv. oppervlakte)?
+    Gebruik dan grootste_monumenten_oppervlakte() -- die berekent server-side
+    met geof:area() en stuurt nooit ruwe WKT terug, ongeacht het aantal
+    monumenten. validate_query_structured() waarschuwt hiervoor als je een
+    query zonder kleine LIMIT met geo:asWKT probeert.
     """
     try:
         data = execute_sparql(sparql_query)
@@ -480,7 +502,9 @@ def query_sparql_geojson(
 
 
 @mcp.tool()
-def grootste_monumenten_oppervlakte(limit: int = 10, class_name: str = "Rijksmonument") -> str:
+def grootste_monumenten_oppervlakte(
+    limit: int = 10, class_name: str = "Rijksmonument", monument_aard: str | None = None
+) -> str:
     """Vind de monumenten met de grootste oppervlakte, berekend uit hun polygoongeometrie.
 
     Beantwoordt vragen als "wat is het grootste rijksmonument qua
@@ -509,9 +533,18 @@ def grootste_monumenten_oppervlakte(limit: int = 10, class_name: str = "Rijksmon
     Let op: niet elke class heeft monumenten met polygoongeometrie; een lege
     uitkomst betekent dan geen bug maar afwezigheid van polygoondata voor die
     class.
+    monument_aard: optioneel, "archeologisch" of "onroerend gebouwd" (zie
+    semantics_describe_topic('monument_aard')) om binnen "Rijksmonument"
+    verder te filteren op ceo:heeftMonumentAard -- gebruik dit voor vragen als
+    "grootste archeologische rijksmonumenten qua oppervlakte" in plaats van
+    zelf per monument de WKT op te halen: bij grotere aantallen (bv. de
+    ~1.499 archeologische of ~61.500 onroerend-gebouwde rijksmonumenten)
+    overschrijdt ruwe WKT al snel de tool-resultaatlimiet (zie query_sparql()).
     """
     try:
-        return format_largest_by_area(largest_by_area(limit=limit, class_name=class_name))
+        return format_largest_by_area(
+            largest_by_area(limit=limit, class_name=class_name, monument_aard=monument_aard)
+        )
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         code, advies = classify_error(body, e.code)

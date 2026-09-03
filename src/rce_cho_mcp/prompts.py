@@ -177,4 +177,16 @@ Ontwerpregels:
   test met een bekende, verifieerbare waarde of het filter daadwerkelijk
   toepast, in plaats van aan te nemen dat een 200-status en geldige JSON
   betekent dat het filter werkte.
+- Bij grote resultaatsets (honderden tot tienduizenden rijen): max_rows in
+  query_sparql() beperkt alleen de weergave, niet wat de query zelf ophaalt
+  -- zet ook in de SPARQL-query zelf een LIMIT. Selecteer je geo:asWKT
+  (polygoongeometrie)? Houd LIMIT dan klein (<= 30): 100 rijen polygoon-WKT
+  was in test al >500.000 tekens, ruim boven de tool-resultaatlimiet. Wil je
+  iets over veel geometrieën tegelijk berekenen (bv. oppervlakte), gebruik
+  dan grootste_monumenten_oppervlakte() i.p.v. zelf WKT op te halen en te
+  verwerken -- die berekent server-side en stuurt nooit ruwe WKT terug. Voor
+  bulk-scans van smalle kolommen (alleen URI's/nummers/korte labels, geen
+  WKT/omschrijving) is gewone LIMIT/OFFSET-paginering wel prima bruikbaar:
+  dit endpoint heeft, anders dan het Kadaster KKG-endpoint, geen hard
+  OFFSET-limiet bij 10.000 (getest tot OFFSET 60.000 zonder fout).
 """
