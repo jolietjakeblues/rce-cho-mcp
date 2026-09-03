@@ -61,6 +61,16 @@ del _row
 
 USER_AGENT = "rce-cho-mcp/0.2.0b1"
 
+# Kadaster Kennisgraph (KKG) SPARQL-endpoint, gebruikt door brk_spatial.py voor
+# de spatial join tussen RCE-monumentgeometrie en Kadaster-percelen. Zelfde
+# endpoint als de losse kadaster-kkg-mcp server (mcp__kadaster-kkg__*); hier
+# rechtstreeks aangeroepen zodat brk_spatial geen afhankelijkheid heeft op die
+# losse MCP-server-runtime.
+KKG_SPARQL_ENDPOINT = os.getenv(
+    "KKG_SPARQL_ENDPOINT",
+    "https://api.labs.kadaster.nl/datasets/kadaster/kkg/services/kkg/sparql",
+)
+
 # Public, unauthenticated GraphQL API of the NDE Network of Terms
 # (https://termennetwerk.netwerkdigitaalerfgoed.nl/), used for fuzzy
 # concept search with synonyms across published thesauri (CHT, ABR, ...).

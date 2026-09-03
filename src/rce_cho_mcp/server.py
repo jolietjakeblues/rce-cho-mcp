@@ -2,6 +2,9 @@ import urllib.error
 
 from mcp.server.fastmcp import FastMCP
 
+from rce_cho_mcp.area import format_largest_by_area, largest_by_area
+from rce_cho_mcp.brk_spatial import format_percelen_via_spatial_join
+from rce_cho_mcp.brk_spatial import percelen_via_spatial_join as _percelen_via_spatial_join
 from rce_cho_mcp.ontology.api import (
     describe_class,
     describe_property,
@@ -474,6 +477,89 @@ def query_sparql_geojson(
         }
 
     return to_geojson(data, wkt_var=wkt_var, convert_rd=convert_rd)
+
+
+@mcp.tool()
+def grootste_monumenten_oppervlakte(limit: int = 10, class_name: str = "Rijksmonument") -> str:
+    """Vind de monumenten met de grootste oppervlakte, berekend uit hun polygoongeometrie.
+
+    Beantwoordt vragen als "wat is het grootste rijksmonument qua
+    oppervlakte" in één tool call, zonder dat je zelf WKT hoeft op te halen
+    en te berekenen met bijvoorbeeld Shapely.
+
+    Achtergrond: ceo:oppervlakteInVierkanteMeters bestaat alleen op de ~1.400
+    Geometrie-objecten van historische buitenplaatsen/tuinen
+    (ceo:heeftAanlegGeometrie). Voor de overige monumenten berekent deze tool
+    de oppervlakte on-the-fly met de GeoSPARQL-functie geof:area() op
+    ceo:heeftGeometrie -> geo:asWKT, en sorteert veilig met een
+    tweetraps-subquery (vermijdt de bekende ORDER BY + OPTIONAL 504-valkuil
+    op dit endpoint).
+
+    BELANGRIJK: alleen monumenten met een POLYGON/MULTIPOLYGON-geometrie
+    hebben een berekenbare oppervlakte. De meerderheid van de rijksmonumenten
+    heeft alleen een POINT-geometrie (geen oppervlakte) en wordt hier dus
+    niet in meegenomen -- dit is geen bug, maar een beperking van de
+    brondata. Van de rijksmonumenten met een geometrie is ongeveer 19%
+    polygoon/multipolygoon.
+
+    limit: aantal resultaten (1-100, standaard 10).
+    class_name: CEO-classnaam om op te filteren (standaard "Rijksmonument",
+    bv. ook "ArcheologischTerrein", "Gezicht", "Complex" -- gebruik
+    ontology_search() of ontology_describe_class() om classnamen te vinden).
+    Let op: niet elke class heeft monumenten met polygoongeometrie; een lege
+    uitkomst betekent dan geen bug maar afwezigheid van polygoondata voor die
+    class.
+    """
+    try:
+        return format_largest_by_area(largest_by_area(limit=limit, class_name=class_name))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+    except Exception as e:
+        return f"Onverwachte fout: {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+def percelen_via_spatial_join(rijksmonument: str, limit: int = 20) -> str:
+    """Vind alle kadastrale percelen die een rijksmonument daadwerkelijk
+    overlapt, via een echte spatial join met het Kadaster KKG-endpoint --
+    onafhankelijk van RCE's eigen BRK-relatie.
+
+    BELANGRIJK, waarom deze tool bestaat: RCE's eigen ceo:BasisregistratieRelatie
+    -> ceo:heeftBRKRelatie-koppeling is NIET gegarandeerd compleet. Bij het ene
+    monument staat de volledige perceellijst (bv. ~289 percelen bij een grote
+    buitenplaats), bij het andere maar één perceel met een aantekening als
+    "exacte punt-in-perceel match" -- kennelijk een steekproef, geen
+    uitputtende lijst, zonder dat je dit vooraf aan de data kunt zien. Gebruik
+    daarom deze tool (of controleer expliciet de aannemelijkheid van het
+    aantal) in plaats van te vertrouwen op de eerste/enige BRK-treffer.
+
+    Werking: haalt RCE's monumentgeometrie op (bij voorkeur POLYGON/
+    MULTIPOLYGON voor volledige dekking, anders het beschikbare POINT), en
+    zoekt daarmee via geof:sfIntersects welke Kadaster-percelen die geometrie
+    overlappen, binnen de gemeente(n) die RCE aan het monument koppelt (nodig
+    om een timeout te vermijden -- een scan zonder gemeente-restrictie over
+    de ~8,4 miljoen percelen in de KKG time-out net als de bekende
+    geof:sfWithin-timeout op het RCE-endpoint zelf).
+
+    Retourneert per perceel de URI en oppervlakte (geosparql:hasMetricArea,
+    al gematerialiseerd in de KKG), plus de som en een plausibiliteitscontrole
+    tegen de monumentoppervlakte zelf (via geof:area, zie
+    grootste_monumenten_oppervlakte()) indien een polygoon beschikbaar is.
+
+    rijksmonument: rijksmonumentnummer (bv. "529782") of volledige
+    rijksmonument-URI.
+    limit: hoeveel percelen getoond worden in de resultatenlijst, gesorteerd
+    op oppervlakte (aflopend). Het getoonde aantal_percelen/totale
+    oppervlakte gelden voor de volledige gevonden set, niet alleen deze top.
+
+    Let op: als een monument fysiek over een gemeentegrens heen ligt die
+    RCE's eigen heeftGemeente-link niet toont, mist deze tool de percelen in
+    de niet-vermelde gemeente -- een duidelijk te lage totale oppervlakte
+    t.o.v. de monumentoppervlakte kan hierop wijzen.
+    """
+    return format_percelen_via_spatial_join(_percelen_via_spatial_join(rijksmonument, limit=limit))
 
 
 @mcp.tool()

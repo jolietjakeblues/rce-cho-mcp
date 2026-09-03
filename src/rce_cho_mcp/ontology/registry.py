@@ -88,6 +88,46 @@ def get_properties_for_class(class_name: str) -> dict[str, str]:
     return dict(sorted(properties.items()))
 
 
+# Curated cross-references, aanvullend op wat rechtstreeks uit de ontologie-
+# TTL valt af te leiden (rdfs:label/comment/domain/range). Zie semantics.py
+# voor de volledige, doorzoekbare kennislaag.
+CLASS_NOTES: dict[str, str] = {
+    "Rijksmonument": (
+        "Bij type-/categorievragen (vliegveld, fort, begraafplaats, "
+        "landgoed, fabriek, industrieterrein, ...): gebruik hiervoor "
+        "ceo:heeftOorspronkelijkeFunctie / ceo:heeftHuidigeFunctie, NIET "
+        "ceo:heeftMonumentAard (dat is binair: archeologisch / onroerend "
+        "gebouwd, geen type-classificatie). Zie "
+        "semantics_describe_topic('functions')."
+    ),
+}
+
+PROPERTY_NOTES: dict[str, str] = {
+    "heeftMonumentAard": (
+        "Deze property kent slechts twee waarden (archeologisch / onroerend "
+        "gebouwd) en is GEEN fijnmazige type-classificatie. Voor vragen als "
+        "'welke rijksmonumenten zijn vliegvelden/forten/begraafplaatsen' is "
+        "dit het verkeerde pad -- gebruik ceo:heeftOorspronkelijkeFunctie / "
+        "ceo:heeftHuidigeFunctie. Zie semantics_describe_topic('functions') "
+        "en semantics_describe_topic('monument_aard')."
+    ),
+    "heeftOorspronkelijkeFunctie": (
+        "Dit pad (samen met ceo:heeftHuidigeFunctie) is het juiste pad voor "
+        "fijnmazige type-/categorievragen (vliegveld, fort, begraafplaats, "
+        "landgoed, fabriek, ...) -- niet ceo:heeftMonumentAard. Vervolgpad: "
+        "-> ceo:heeftFunctieNaam -> skos:prefLabel. Zie een geverifieerd "
+        "voorbeeld en de synoniem-valkuil (letterlijk zoekwoord != "
+        "thesaurusterm) in semantics_describe_topic('functions')."
+    ),
+    "heeftHuidigeFunctie": (
+        "Zie ceo:heeftOorspronkelijkeFunctie: zelfde vervolgpad "
+        "(-> ceo:heeftFunctieNaam -> skos:prefLabel), gebruik dit specifiek "
+        "voor vragen over huidig gebruik. Zie "
+        "semantics_describe_topic('functions')."
+    ),
+}
+
+
 def describe_class(class_name: str) -> str:
     classes = get_classes()
 
@@ -111,6 +151,10 @@ def describe_class(class_name: str) -> str:
 
     if properties:
         lines.extend(f"- {name}: {prop_uri}" for name, prop_uri in properties.items())
+
+    if class_name in CLASS_NOTES:
+        lines.append("")
+        lines.append(f"Let op: {CLASS_NOTES[class_name]}")
 
     return "\n".join(lines)
 
@@ -196,5 +240,9 @@ def describe_property(property_name: str) -> str:
         lines.extend(f"- {range_uri}" for range_uri in ranges)
     else:
         lines.append("- Geen range gevonden.")
+
+    if property_name in PROPERTY_NOTES:
+        lines.append("")
+        lines.append(f"Let op: {PROPERTY_NOTES[property_name]}")
 
     return "\n".join(lines)

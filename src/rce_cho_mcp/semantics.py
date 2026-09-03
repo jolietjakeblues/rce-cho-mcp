@@ -3,7 +3,11 @@ SEMANTIC_TOPICS = {
         "title": "Functies",
         "description": (
             "Gebruik functiepaden wanneer een vraag gaat over wat een monument is "
-            "of oorspronkelijk was. Filter niet op naam of omschrijving."
+            "of oorspronkelijk was, inclusief fijnmazige type-categorisering zoals "
+            "vliegveld, fort, begraafplaats, landgoed, fabriek of industrieterrein. "
+            "Filter niet op naam of omschrijving. Gebruik hiervoor NIET "
+            "ceo:heeftMonumentAard -- dat kent slechts twee waarden (archeologisch / "
+            "onroerend gebouwd), zie semantics_describe_topic('monument_aard')."
         ),
         "patterns": [
             {
@@ -85,6 +89,52 @@ SEMANTIC_TOPICS = {
                     "nooit los in ceo:omschrijving zonder deze markering."
                 ),
             },
+            {
+                "name": "Geverifieerd voorbeeld: type-categorisering (fort)",
+                "path": [
+                    "ceo:heeftOorspronkelijkeFunctie",
+                    "ceo:heeftFunctieNaam",
+                    "skos:prefLabel",
+                ],
+                "guidance": (
+                    "Live tegen het endpoint bevestigd (2026-09-03): SELECT DISTINCT "
+                    "?rm ?naam WHERE { ?rm ceo:heeftOorspronkelijkeFunctie ?fObj . "
+                    "?fObj ceo:heeftFunctieNaam ?fC . ?fC skos:prefLabel ?fNaam . "
+                    "FILTER(lang(?fNaam)=\"nl\") FILTER(CONTAINS(LCASE(?fNaam), "
+                    "\"fort\")) OPTIONAL { ?rm ceo:heeftNaam ?nObj . ?nObj ceo:naam "
+                    "?naam . } } LIMIT 10 -- levert echte functienamen op zoals "
+                    "'Fort', 'Kustfort', 'Torenfort' en 'Fort, vesting en "
+                    "-onderdelen', gekoppeld aan bestaande rijksmonument-URI's "
+                    "(o.a. met naam 'Gentse Poort'). Gebruik dit patroon als "
+                    "sjabloon voor elke functiecategorie-vraag."
+                ),
+            },
+            {
+                "name": "Synoniem-valkuil: het letterlijke zoekwoord is niet de thesaurusterm",
+                "path": [
+                    "ceo:heeftOorspronkelijkeFunctie",
+                    "ceo:heeftFunctieNaam",
+                    "skos:prefLabel",
+                ],
+                "guidance": (
+                    "CONTAINS(LCASE(?fNaam), ...) matcht alleen de exacte "
+                    "thesaurusterm, geen synoniemen. Live geverifieerd: CONTAINS "
+                    "op 'vliegveld' levert 0 resultaten op in ceo:heeftFunctieNaam "
+                    "-- niet omdat er geen vliegvelden in de dataset staan, maar "
+                    "omdat de functienaam-thesaurus andere termen gebruikt: "
+                    "'Luchthavencomplex' en 'Vliegtuighangar' (CONTAINS op "
+                    "'luchthaven' levert wel treffers op, o.a. 'Burgerluchthaven "
+                    "Welschap' en 'Loods Fliegerhorst'). Concludeer dus nooit uit "
+                    "0 resultaten op het letterlijke woord uit de vraag dat een "
+                    "categorie niet voorkomt. Gebruik eerst "
+                    "zoek_concept_termennetwerk(term) (doorzoekt de CHT/ABR-"
+                    "thesauri waaruit deze functienaam-concepten ook daadwerkelijk "
+                    "afkomstig zijn, bv. https://data.cultureelerfgoed.nl/term/id/"
+                    "cht/... voor 'fort') om broader/narrower-synoniemen te vinden "
+                    "-- bv. 'vliegveld' geeft via narrower 'luchthavens' -- en "
+                    "filter daarna in de SPARQL-query op die gevonden term(en)."
+                ),
+            },
         ],
     },
     "legal_status": {
@@ -163,6 +213,7 @@ SEMANTIC_TOPICS = {
                 ],
                 "known_value_uris": {
                     "archeologisch": "https://data.cultureelerfgoed.nl/term/id/rn/2/b673c8c1-5d93-496d-8f9e-89133d579d77",
+                    "onroerend gebouwd": "https://data.cultureelerfgoed.nl/term/id/rn/2/fc966a68-8863-4970-a83e-110f96006c21",
                 },
                 "graph": "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
                 "guidance": (
@@ -178,9 +229,19 @@ SEMANTIC_TOPICS = {
                     "puntcoordinaten), niet op de 2963 die een naieve COUNT(?cho) "
                     "oplevert. Filter bij voorkeur direct op de concept-URI "
                     "(ceo:heeftMonumentAard <...b673c8c1-5d93-496d-8f9e-89133d579d77> "
-                    "voor 'archeologisch') in plaats van op skos:prefLabel-tekst -- "
+                    "voor 'archeologisch', <...fc966a68-8863-4970-a83e-110f96006c21> "
+                    "voor 'onroerend gebouwd') in plaats van op skos:prefLabel-tekst -- "
                     "geverifieerd tegen de live dataset, geen taalstring nodig "
-                    "(dit concept heeft geen lang-tag op zijn prefLabel)."
+                    "(dit concept heeft geen lang-tag op zijn prefLabel).\n"
+                    "BELANGRIJK, veelgemaakte fout: ceo:heeftMonumentAard heeft "
+                    "PRECIES deze twee waarden en niets anders -- het is GEEN "
+                    "fijnmazige type- of categorieclassificatie. Voor vragen als "
+                    "'welke rijksmonumenten zijn vliegvelden/forten/begraafplaatsen/"
+                    "landgoederen/fabrieken/industrieterreinen' is heeftMonumentAard "
+                    "dus het verkeerde pad, ook al lijkt 'aard' semantisch op "
+                    "'soort'. Gebruik daarvoor ceo:heeftOorspronkelijkeFunctie / "
+                    "ceo:heeftHuidigeFunctie (of ceo:heeftType) -- zie "
+                    "semantics_describe_topic('functions')."
                 ),
             },
         ],
@@ -464,6 +525,51 @@ SEMANTIC_TOPICS = {
                 ),
             },
             {
+                "name": "Oppervlakte berekenen (geof:area) -- gebruik liever grootste_monumenten_oppervlakte()",
+                "path": [
+                    "ceo:heeftGeometrie",
+                    "geo:asWKT",
+                ],
+                "guidance": (
+                    "Voor 'grootste monument qua oppervlakte'-vragen: gebruik de "
+                    "tool grootste_monumenten_oppervlakte() -- die bevat dit hele "
+                    "patroon al, inclusief de 504-workaround. Gebruik dit pad zelf "
+                    "alleen als je iets net anders nodig hebt dan die tool biedt "
+                    "(bv. een oppervlaktedrempel filteren). "
+                    "ceo:oppervlakteInVierkanteMeters bestaat alleen op de ~1.400 "
+                    "Geometrie-objecten van historische buitenplaatsen/tuinen "
+                    "(via ceo:heeftAanlegGeometrie) -- voor alle andere "
+                    "rijksmonumenten bestaat geen gematerialiseerd oppervlakteveld. "
+                    "Bereken de oppervlakte in plaats daarvan on-the-fly met de "
+                    "GeoSPARQL-functie geof:area(?wkt, uom:metre) op ceo:heeftGeometrie "
+                    "-> geo:asWKT (PREFIX geof: <http://www.opengis.net/def/function/"
+                    "geosparql/>, PREFIX uom: <http://www.opengis.net/def/uom/OGC/1.0/>). "
+                    "Geverifieerd tegen dit endpoint: geof:area verwacht PRECIES twee "
+                    "argumenten (wkt-literal + eenheid-URI) -- met één argument geeft "
+                    "het endpoint HTTP 400. Met uom:metre levert het een geodetische "
+                    "oppervlakte in m2 direct uit WGS84-coordinaten, geen conversie nodig. "
+                    "Werkt alleen op POLYGON/MULTIPOLYGON, niet op POINT: van de "
+                    "~128.896 ceo:heeftGeometrie-triples op Rijksmonument is de "
+                    "meerderheid (104.236) een POINT zonder oppervlakte, slechts "
+                    "14.291 POLYGON en 10.369 MULTIPOLYGON. Val op: de WKT-literals in "
+                    "deze dataset gebruiken gemengde hoofdletters MET spatie voor het "
+                    "type-keyword (bv. 'Polygon (...)', 'Point (...)'), niet de striktere "
+                    "vorm 'POLYGON(...)' -- FILTER(STRSTARTS(STR(?wkt), \"POLYGON\")) "
+                    "geeft hierdoor stil 0 resultaten. Gebruik altijd "
+                    "FILTER(REGEX(STR(?wkt), \"^\\\\s*(multi)?polygon\", \"i\")). Combineer "
+                    "geof:area()-sortering nooit direct met OPTIONAL-joins (naam, "
+                    "rijksmonumentnummer) in dezelfde queryschaal -- dat triggert de "
+                    "bekende ORDER BY + OPTIONAL 504. Gebruik de tweetraps-subquery: "
+                    "SELECT DISTINCT ?rm (geof:area(?wkt, uom:metre) AS ?opp) sorteren en "
+                    "LIMIT-en in een binnenste query zonder OPTIONAL, en pas in de "
+                    "buitenste query OPTIONAL-joins toevoegen op de al-beperkte set. "
+                    "Live geverifieerd voorbeeld (2026-09-03): het grootste rijksmonument "
+                    "qua oppervlakte is 'Deelen/Vliegveld' (rijksmonumentnummer 529782), "
+                    "circa 8,67 km2 -- zie grootste_monumenten_oppervlakte() voor de "
+                    "kant-en-klare implementatie."
+                ),
+            },
+            {
                 "name": "Fallback bij onvolledige adresgegevens: koppelen via PDOK Locatieserver",
                 "path": [
                     "ceo:heeftBasisregistratieRelatie",
@@ -487,6 +593,85 @@ SEMANTIC_TOPICS = {
                     "RCE-zijde is. Dit is een externe bron (PDOK), niet het RCE "
                     "CHO-endpoint zelf, dus vereist een aparte HTTP-aanroep na de "
                     "SPARQL-query."
+                ),
+            },
+        ],
+    },
+    "kadaster": {
+        "title": "Kadastrale percelen (BRK-relatie) -- niet gegarandeerd compleet",
+        "description": (
+            "Gebruik dit topic bij vragen over welke kadastrale percelen bij "
+            "een rijksmonument horen, of over de totale kadastrale oppervlakte "
+            "van een monument. BELANGRIJKSTE punt: RCE's eigen BRK-koppeling "
+            "is NIET gegarandeerd een volledige perceellijst -- ga daar niet "
+            "zonder controle van uit."
+        ),
+        "patterns": [
+            {
+                "name": "RCE's eigen BRK-relatie (tekstueel, mogelijk onvolledig)",
+                "path": [
+                    "ceo:heeftBasisregistratieRelatie",
+                    "ceo:heeftBRKRelatie",
+                ],
+                "guidance": (
+                    "Kernpatroon: CultuurhistorischObject -> "
+                    "ceo:heeftBasisregistratieRelatie -> ceo:BasisregistratieRelatie "
+                    "-> ceo:heeftBRKRelatie -> ceo:BRKRelatie (gemeentenaam/sectie/"
+                    "perceelnummer). BELANGRIJKE VALKUIL, met echte voorbeelden: bij "
+                    "het ene monument (buitenplaats Twickel) stonden alle ~289 "
+                    "onderliggende percelen expliciet vermeld; bij een ander monument "
+                    "(Vliegveld Deelen, rijksmonumentnummer 529782) stond er maar "
+                    "EEN BRKRelatie, met een aantekening als 'exacte punt-in-perceel "
+                    "match' -- kennelijk een steekproef/ankerpunt, geen uitputtende "
+                    "lijst. Je kunt dit vooraf niet aan de query zien: beide monumenten "
+                    "hebben gewoon een of meer ceo:BRKRelatie-triples, zonder markering "
+                    "welke van de twee volledigheidsgevallen je voor je hebt. Neem dus "
+                    "NOOIT aan dat het eerste (of enige) resultaat de volledige lijst "
+                    "is, vooral niet bij een monument dat qua omvang/type een "
+                    "meervoudig-perceel-object lijkt (buitenplaats, landgoed, "
+                    "vliegveld, fort, complex). Controleer expliciet of het aantal "
+                    "gevonden percelen aannemelijk is voor de omvang van het monument "
+                    "(vergelijk desnoods met grootste_monumenten_oppervlakte() of "
+                    "geof:area(), zie semantics_describe_topic('geometry')) voordat je "
+                    "een BRK-uitkomst als compleet presenteert."
+                ),
+            },
+            {
+                "name": "Betrouwbaar alternatief: spatial join met Kadaster KKG",
+                "path": [
+                    "ceo:heeftGeometrie",
+                    "geo:asWKT",
+                ],
+                "guidance": (
+                    "Gebruik de tool percelen_via_spatial_join(rijksmonument, limit) "
+                    "voor een geometrisch geverifieerd antwoord, onafhankelijk van wat "
+                    "RCE's eigen (mogelijk onvolledige) BRK-relatie zegt: deze tool "
+                    "haalt RCE's monumentgeometrie op en berekent zelf, via een echte "
+                    "spatial join tegen Kadaster's KKG-endpoint (geof:sfIntersects "
+                    "tussen ceo:heeftGeometrie/geo:asWKT en imxgeo:Perceel -> "
+                    "geosparql:hasGeometry/asWKT), welke percelen het monument "
+                    "daadwerkelijk overlapt, met hun totale oppervlakte "
+                    "(geosparql:hasMetricArea, al gematerialiseerd in de KKG -- geen "
+                    "berekening nodig aan die kant). Geverifieerd live (2026-09-03): "
+                    "Vliegveld Deelen (rijksmonumentnummer 529782) -> 33 overlappende "
+                    "percelen, 6.801.806 m2 totaal, tegenover 8.674.092 m2 "
+                    "monumentoppervlakte (78% -- plausibel: niet elk perceel binnen de "
+                    "monumentgrens heeft per se hasGeometry/hasMetricArea in de KKG, en "
+                    "een monument kan net over een gemeentegrens heenlopen die RCE's "
+                    "eigen heeftGemeente-link niet toont). RCE (WGS84 wktLiteral) en "
+                    "KKG (WGS84, maar het Virtuoso-eigen datatype virtrdf:Geometry) "
+                    "staan op TWEE APARTE endpoints; een SERVICE-federated query in "
+                    "EEN keer bleek in test niet betrouwbaar (een buiten de SERVICE "
+                    "gebonden variabele in een geof:sfIntersects-FILTER leverde 0 "
+                    "resultaten op), dus doet deze tool de join met twee losse "
+                    "HTTP-calls. Virtuoso's eigen bif:st_intersects/bif:st_area op het "
+                    "KKG-endpoint gaf consistent HTTP 500 (niet bruikbaar via dit "
+                    "gehoste endpoint) -- gebruik geof:sfIntersects (standaard "
+                    "GeoSPARQL), en beperk de kandidatenset eerst niet-ruimtelijk tot "
+                    "een specifieke imxgeo:Gemeentegebied (via "
+                    "imxgeo:ligtInRegistratieveRuimte), anders time-out een scan over "
+                    "de ~8,4 miljoen imxgeo:Perceel-instanties net als de bekende "
+                    "geof:sfWithin-timeout op het RCE-endpoint zelf."
                 ),
             },
         ],

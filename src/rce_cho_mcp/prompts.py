@@ -74,7 +74,7 @@ Belangrijke RCE-patronen:
 - Juridische status:
   ceo:heeftJuridischeStatus
   -> skos:prefLabel
-- Monumentaard:
+- Monumentaard (LET OP: binair, GEEN type-classificatie -- zie hieronder):
   ceo:heeftMonumentAard
   -> skos:prefLabel
 - Naam:
@@ -119,7 +119,15 @@ Ontwerpregels:
   gebruik functieconcepten en functie-relaties.
 - Gebruik juridische status om te bepalen of iets rijksmonument,
   voorbeschermd of geen rijksmonument is.
-- Gebruik monumentaard om gebouwd en archeologisch te onderscheiden.
+- Gebruik monumentaard om gebouwd en archeologisch te onderscheiden. Dit zijn
+  de ENIGE twee waarden van ceo:heeftMonumentAard. Gebruik dit NIET voor
+  fijnmazige type- of categorievragen zoals vliegveld, fort, begraafplaats,
+  landgoed, fabriek of industrieterrein -- gebruik daarvoor
+  ceo:heeftOorspronkelijkeFunctie / ceo:heeftHuidigeFunctie (zie
+  semantics_describe_topic('functions')). Het letterlijke woord uit de vraag
+  hoeft niet de thesaurusterm te zijn (bv. 'vliegveld' -> 'Luchthavencomplex'
+  in de data) -- gebruik bij 0 resultaten eerst zoek_concept_termennetwerk()
+  voor synoniemen voordat je concludeert dat een categorie niet voorkomt.
 - Gebruik ceo:registergegeven niet als juridische status.
 - Data kan verspreid zijn over meerdere named graphs.
 - Een query zonder FROM of GRAPH kan soms correct zijn.
