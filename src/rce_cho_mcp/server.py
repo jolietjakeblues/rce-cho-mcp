@@ -5,6 +5,9 @@ from mcp.server.fastmcp import FastMCP
 from rce_cho_mcp.area import format_largest_by_area, largest_by_area
 from rce_cho_mcp.brk_spatial import format_percelen_via_spatial_join
 from rce_cho_mcp.brk_spatial import percelen_via_spatial_join as _percelen_via_spatial_join
+from rce_cho_mcp.gemeente import format_monumenten_in_gemeente
+from rce_cho_mcp.gemeente import monumenten_in_gemeente as _monumenten_in_gemeente
+from rce_cho_mcp.gemeente import resolve_gemeente as _resolve_gemeente
 from rce_cho_mcp.ontology.api import (
     describe_class,
     describe_property,
@@ -234,6 +237,88 @@ def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl"
         lines.append(f"- {match['uri']} (type: {types})")
 
     return "\n".join(lines)
+
+@mcp.tool()
+def resolve_gemeente(gemeente: str) -> str:
+    """Resolveer een gemeentenaam naar zijn OWMS concept-URI.
+
+    Anders dan resolve_concept_label(label, graph_name="owms") filtert dit
+    altijd op rdf:type owms:Gemeente, zodat een gelijknamige provincie of
+    kadastrale gemeente niet als kandidaat meekomt -- bv. skos:prefLabel
+    "Utrecht"@nl matcht in de owms-graph zonder dit typefilter drie
+    concepten (gemeente, provincie, kadastrale gemeente), elk met hetzelfde
+    label. Geeft een foutmelding bij nul of meerdere matches in plaats van
+    te gokken.
+
+    Gebruik dit vóór een handgeschreven SPARQL-query die filtert op gemeente
+    via ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente. Voor de
+    combinatie "monumenten in gemeente X" (inclusief de juiste graph en een
+    standaard juridische-statusfilter) kan monumenten_in_gemeente() vaak de
+    handgeschreven query helemaal vervangen.
+    """
+    result = _resolve_gemeente(gemeente)
+    if "error" in result:
+        extra = result.get("kandidaten")
+        if extra:
+            return result["error"] + "\nKandidaten:\n" + "\n".join(extra)
+        return result["error"]
+    return f"{result['naam']}: {result['uri']}"
+
+
+@mcp.tool()
+def monumenten_in_gemeente(
+    gemeente: str,
+    juridische_status: str = "rijksmonument",
+    class_name: str = "Rijksmonument",
+    monument_aard: str | None = None,
+    limit: int = 50,
+) -> str:
+    """Tel en toon monumenten in een gemeente, met automatische
+    gemeente-resolutie, de juiste graph en een standaard
+    juridische-statusfilter -- combineert in één aanroep wat anders drie
+    losse, foutgevoelige stappen zijn (resolve_concept_label op owms,
+    GRAPH instanties-rce onthouden, handmatig heeftJuridischeStatus
+    toevoegen).
+
+    gemeente: gemeentenaam (bv. "Utrecht", "'s-Hertogenbosch"). Wordt
+    automatisch gedisambigueerd tegen gelijknamige provincies/kadastrale
+    gemeenten (zie resolve_gemeente()) en opgelost naar de concept-URI.
+    juridische_status: "rijksmonument" (standaard, actief beschermd),
+    "voorbeschermd", "geen rijksmonument", of "alle" om niet op status te
+    filteren. Zie semantics_describe_topic('legal_status').
+    class_name: CEO-class (standaard "Rijksmonument"; ook bv.
+    "ArcheologischTerrein", "Complex", "Gezicht" -- gebruik ontology_search()
+    om classnamen te vinden).
+    monument_aard: optioneel, "archeologisch" of "onroerend gebouwd" (zie
+    semantics_describe_topic('monument_aard')) om binnen class_name verder
+    te filteren op ceo:heeftMonumentAard.
+    limit: hoeveel rijen getoond worden in de steekproef (1-200); "Aantal"
+    in het resultaat geldt voor de volledige gevonden set, niet alleen deze
+    steekproef.
+
+    Let op: dit filtert op de gemeente die RCE zelf aan het monument
+    koppelt (ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente) -- als die
+    koppeling ontbreekt of een monument over een gemeentegrens heen ligt die
+    RCE niet toont, mist deze tool dat monument (zelfde beperking als
+    percelen_via_spatial_join()).
+    """
+    try:
+        return format_monumenten_in_gemeente(
+            _monumenten_in_gemeente(
+                gemeente,
+                juridische_status=juridische_status,
+                class_name=class_name,
+                monument_aard=monument_aard,
+                limit=limit,
+            )
+        )
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+    except Exception as e:
+        return f"Onverwachte fout: {type(e).__name__}: {e}"
+
 
 @mcp.tool()
 def zoek_concept_termennetwerk(
