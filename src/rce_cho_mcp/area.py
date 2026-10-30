@@ -44,25 +44,25 @@ Geverifieerd tegen het live endpoint (2026-09-03):
   "Deelen/Vliegveld" (rijksmonumentnummer 529782) met ~8,67 km2.
 """
 
+from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH as _INSTANTIES_GRAPH
 from rce_cho_mcp.ontology.registry import get_classes
+from rce_cho_mcp.semantics import get_known_value_uris
 from rce_cho_mcp.sparql import execute_sparql
+from rce_cho_mcp.sparql import rows as _sparql_rows
 
 _DEFAULT_CLASS = "Rijksmonument"
-_INSTANTIES_GRAPH = "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce"
 _QUERY_TIMEOUT = 60
 
 _MIN_LIMIT = 1
 _MAX_LIMIT = 100
 
-# Zie semantics_describe_topic('monument_aard'): ceo:heeftMonumentAard kent
-# precies deze twee waarden. Hier herbruikt zodat "grootste archeologische
-# monumenten qua oppervlakte" in 1 tool call kan, zonder ooit ruwe WKT naar de
-# aanroeper te sturen (zie query_sparql's docstring voor waarom dat bij
-# grotere aantallen de tool-resultaatlimiet raakt).
-_MONUMENT_AARD_URIS = {
-    "archeologisch": "https://data.cultureelerfgoed.nl/term/id/rn/2/b673c8c1-5d93-496d-8f9e-89133d579d77",
-    "onroerend gebouwd": "https://data.cultureelerfgoed.nl/term/id/rn/2/fc966a68-8863-4970-a83e-110f96006c21",
-}
+# Eén bron: semantics_describe_topic('monument_aard') -- zie
+# get_known_value_uris() in semantics.py. Ook gebruikt door gemeente.py,
+# zodat deze concept-URI's niet in meerdere modules los staan. Hier gebruikt
+# zodat "grootste archeologische monumenten qua oppervlakte" in 1 tool call
+# kan, zonder ooit ruwe WKT naar de aanroeper te sturen (zie query_sparql's
+# docstring voor waarom dat bij grotere aantallen de tool-resultaatlimiet raakt).
+_MONUMENT_AARD_URIS = get_known_value_uris("monument_aard")
 
 
 def _clamp_limit(limit: int) -> int:
@@ -135,7 +135,7 @@ SELECT DISTINCT ?rm ?opp ?naam ?rijksmonumentnummer WHERE {{
 ORDER BY DESC(?opp)
 """
     data = execute_sparql(query, timeout=_QUERY_TIMEOUT)
-    bindings = data.get("results", {}).get("bindings", [])
+    bindings = _sparql_rows(data)
 
     rows = [
         {

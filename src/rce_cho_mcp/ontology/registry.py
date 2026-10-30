@@ -1,6 +1,7 @@
 from rdflib import OWL, RDF, RDFS, URIRef
 
 from rce_cho_mcp.ontology.loader import load_ontology
+from rce_cho_mcp.semantics import FUNCTION_PATH_NOTE, MONUMENT_AARD_WARNING
 
 
 def _local_name(uri: URIRef) -> str:
@@ -92,24 +93,13 @@ def get_properties_for_class(class_name: str) -> dict[str, str]:
 # TTL valt af te leiden (rdfs:label/comment/domain/range). Zie semantics.py
 # voor de volledige, doorzoekbare kennislaag.
 CLASS_NOTES: dict[str, str] = {
-    "Rijksmonument": (
-        "Bij type-/categorievragen (vliegveld, fort, begraafplaats, "
-        "landgoed, fabriek, industrieterrein, ...): gebruik hiervoor "
-        "ceo:heeftOorspronkelijkeFunctie / ceo:heeftHuidigeFunctie, NIET "
-        "ceo:heeftMonumentAard (dat is binair: archeologisch / onroerend "
-        "gebouwd, geen type-classificatie). Zie "
-        "semantics_describe_topic('functions')."
-    ),
+    "Rijksmonument": f"{MONUMENT_AARD_WARNING} {FUNCTION_PATH_NOTE}",
 }
 
 PROPERTY_NOTES: dict[str, str] = {
     "heeftMonumentAard": (
-        "Deze property kent slechts twee waarden (archeologisch / onroerend "
-        "gebouwd) en is GEEN fijnmazige type-classificatie. Voor vragen als "
-        "'welke rijksmonumenten zijn vliegvelden/forten/begraafplaatsen' is "
-        "dit het verkeerde pad -- gebruik ceo:heeftOorspronkelijkeFunctie / "
-        "ceo:heeftHuidigeFunctie. Zie semantics_describe_topic('functions') "
-        "en semantics_describe_topic('monument_aard')."
+        f"{MONUMENT_AARD_WARNING} {FUNCTION_PATH_NOTE} Zie ook "
+        "semantics_describe_topic('monument_aard')."
     ),
     "heeftOorspronkelijkeFunctie": (
         "Dit pad (samen met ceo:heeftHuidigeFunctie) is het juiste pad voor "

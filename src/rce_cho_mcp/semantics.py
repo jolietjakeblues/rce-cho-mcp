@@ -1,3 +1,20 @@
+# Gedeelde kerntekst, zodat deze niet onafhankelijk herhaald wordt in
+# ontology/registry.py (CLASS_NOTES/PROPERTY_NOTES) en hieronder in de
+# "monument_aard"-topicguidance -- één bron voor dit terugkerende feit.
+MONUMENT_AARD_WARNING = (
+    "ceo:heeftMonumentAard heeft PRECIES twee waarden (archeologisch / "
+    "onroerend gebouwd) en is GEEN fijnmazige type- of categorieclassificatie, "
+    "ook al lijkt 'aard' semantisch op 'soort'."
+)
+
+FUNCTION_PATH_NOTE = (
+    "Gebruik voor type-/categorievragen (vliegveld, fort, begraafplaats, "
+    "landgoed, fabriek, industrieterrein, ...) in plaats daarvan "
+    "ceo:heeftOorspronkelijkeFunctie / ceo:heeftHuidigeFunctie (of ceo:heeftType). "
+    "Zie semantics_describe_topic('functions')."
+)
+
+
 SEMANTIC_TOPICS = {
     "functions": {
         "title": "Functies",
@@ -233,15 +250,8 @@ SEMANTIC_TOPICS = {
                     "voor 'onroerend gebouwd') in plaats van op skos:prefLabel-tekst -- "
                     "geverifieerd tegen de live dataset, geen taalstring nodig "
                     "(dit concept heeft geen lang-tag op zijn prefLabel).\n"
-                    "BELANGRIJK, veelgemaakte fout: ceo:heeftMonumentAard heeft "
-                    "PRECIES deze twee waarden en niets anders -- het is GEEN "
-                    "fijnmazige type- of categorieclassificatie. Voor vragen als "
-                    "'welke rijksmonumenten zijn vliegvelden/forten/begraafplaatsen/"
-                    "landgoederen/fabrieken/industrieterreinen' is heeftMonumentAard "
-                    "dus het verkeerde pad, ook al lijkt 'aard' semantisch op "
-                    "'soort'. Gebruik daarvoor ceo:heeftOorspronkelijkeFunctie / "
-                    "ceo:heeftHuidigeFunctie (of ceo:heeftType) -- zie "
-                    "semantics_describe_topic('functions')."
+                    f"BELANGRIJK, veelgemaakte fout: {MONUMENT_AARD_WARNING} "
+                    f"{FUNCTION_PATH_NOTE}"
                 ),
             },
         ],
@@ -756,6 +766,16 @@ SEMANTIC_TOPICS = {
         ],
     },
 }
+
+
+def get_known_value_uris(topic: str) -> dict[str, str]:
+    """Return the known_value_uris mapping of a topic's primary pattern.
+
+    Single source of truth for concept URIs such as the legal_status and
+    monument_aard values -- gemeente.py and area.py import this instead of
+    hardcoding the same URIs again as local module constants.
+    """
+    return dict(SEMANTIC_TOPICS[topic]["patterns"][0]["known_value_uris"])
 
 
 def list_topics() -> list[dict]:
