@@ -1,6 +1,7 @@
 import urllib.error
 
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KNOWN_GRAPHS
+from rce_cho_mcp.graphs import NON_QUERYABLE_GRAPH_KEYS
 from rce_cho_mcp.pitfalls import LANGUAGE_TAG_WARNING
 from rce_cho_mcp.sparql import escape_sparql_string, execute_sparql, rows
 
@@ -11,11 +12,21 @@ PREFIXES = """PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
 def _validate_graph_name(graph_name: str) -> None:
     """Allow only known short graph names for graph:localName syntax."""
-    if graph_name not in KNOWN_GRAPHS:
-        allowed = ", ".join(sorted(KNOWN_GRAPHS.keys()))
+    if graph_name in KNOWN_GRAPHS:
+        return
+
+    if graph_name in NON_QUERYABLE_GRAPH_KEYS:
         raise ValueError(
-            f"Unknown graph_name '{graph_name}'. Allowed: {allowed}"
+            f"graph_name '{graph_name}' staat wel in graphs_list(), maar is "
+            "niet query-baar via GRAPH <...> op het RCE CHO SPARQL-endpoint "
+            "(een ontologiebestand of externe TriplyDB-graph) en is daarom "
+            "niet toegestaan hier."
         )
+
+    allowed = ", ".join(sorted(KNOWN_GRAPHS.keys()))
+    raise ValueError(
+        f"Unknown graph_name '{graph_name}'. Allowed: {allowed}"
+    )
 
 
 def resolve_label(

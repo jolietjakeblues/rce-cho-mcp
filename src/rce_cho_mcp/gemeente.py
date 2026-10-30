@@ -39,6 +39,7 @@ from __future__ import annotations
 import re
 
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH as _INSTANTIES_GRAPH
+from rce_cho_mcp.limits import LIST_MAX_LIMIT
 from rce_cho_mcp.ontology.registry import get_classes
 from rce_cho_mcp.semantics import get_known_value_uris
 from rce_cho_mcp.sparql import escape_sparql_string, execute_sparql
@@ -49,7 +50,7 @@ _GEMEENTE_TYPE_URI = "http://standaarden.overheid.nl/owms/terms/Gemeente"
 _QUERY_TIMEOUT = 60
 
 _MIN_LIMIT = 1
-_MAX_LIMIT = 200
+_MAX_LIMIT = LIST_MAX_LIMIT
 
 # Eén bron: semantics_describe_topic('legal_status')/('monument_aard') --
 # zie get_known_value_uris() in semantics.py. Ook gebruikt door area.py, zodat

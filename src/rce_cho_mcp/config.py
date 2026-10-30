@@ -1,17 +1,27 @@
 import os
 
-from rce_cho_mcp.graphs import KNOWN_GRAPH_ROWS
+from rce_cho_mcp.graphs import KNOWN_GRAPH_ROWS, NON_QUERYABLE_GRAPH_KEYS
 
 
-# "Virtuoso" endpoint: supports GeoSPARQL, but has the query quirks documented
-# in semantics.py/validator.py (GROUP BY overflow on long text fields,
-# ORDER BY + OPTIONAL 504s, geof:sfWithin timeouts).
+# "Virtuoso" endpoint. Live getest (2026-10-30): mist de GeoSPARQL-functie
+# geof:area() (HTTP 400 "Unknown function ...geosparql/area()") -- dus NIET
+# het endpoint waar de geof:area()/geof:sfIntersects()-aanroepen in area.py/
+# brk_spatial.py tegen draaien (die lopen standaard via CHO_DATASET_ENDPOINT
+# hieronder). Wel nog in gebruik als fallback-endpoint; de query-valkuilen
+# die elders in deze codebase (validator.py/semantics.py) aan "Virtuoso"
+# worden toegeschreven (GROUP BY-overflow, ORDER BY + OPTIONAL 504s,
+# geof:sfWithin-timeouts) zijn niet opnieuw per-endpoint herverifieerd, dus
+# behandel die toeschrijving als een naam, niet als een geverifieerd feit
+# over welk van de twee endpoints hieronder de fout daadwerkelijk geeft.
 CHO_SERVICE_ENDPOINT = os.getenv(
     "CHO_SERVICE_ENDPOINT",
     "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql",
 )
 
-# "Speedy" endpoint: standards-compliant SPARQL 1.1.
+# "Speedy" endpoint: standards-compliant SPARQL 1.1. Live getest
+# (2026-10-30): ondersteunt geof:area() wel (HTTP 200, correct resultaat) --
+# dit is het endpoint dat area.py/brk_spatial.py in de praktijk gebruiken,
+# want dit is ook de standaard SPARQL_ENDPOINT hieronder.
 CHO_DATASET_ENDPOINT = os.getenv(
     "CHO_DATASET_ENDPOINT",
     "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/sparql",
@@ -34,14 +44,6 @@ DEFAULT_DATASET_GRAPH = os.getenv(
     "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce",
 )
 
-# Graphs that graphs_list() lists for discovery but that are not queryable
-# named graphs on the RCE CHO SPARQL endpoint itself: "ceo-ontology" is a raw
-# ontology file on GitHub and "triply-owms" lives on a separate external
-# TriplyDB service. A GRAPH <...> clause against either silently returns zero
-# results rather than an error, so they are excluded from the graph_name
-# allowlist below.
-_NON_QUERYABLE_GRAPH_KEYS = {"ceo-ontology", "triply-owms"}
-
 # Short, stable aliases kept for backward compatibility with existing callers.
 KNOWN_GRAPHS = {
     "owms": "https://linkeddata.cultureelerfgoed.nl/graph/owms",
@@ -54,7 +56,7 @@ KNOWN_GRAPHS = {
 # Fill in every other graph known to graphs_list() so a graph_name a client
 # just discovered there is guaranteed to also work in resolve_concept_label().
 for _row in KNOWN_GRAPH_ROWS:
-    if _row["key"] not in KNOWN_GRAPHS and _row["key"] not in _NON_QUERYABLE_GRAPH_KEYS:
+    if _row["key"] not in KNOWN_GRAPHS and _row["key"] not in NON_QUERYABLE_GRAPH_KEYS:
         KNOWN_GRAPHS[_row["key"]] = _row["uri"]
 
 del _row

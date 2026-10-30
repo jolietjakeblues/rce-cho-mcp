@@ -166,14 +166,26 @@ KNOWN_GRAPH_ROWS = [
         "uri": "https://raw.githubusercontent.com/cultureelerfgoed/CEO/master/CEO_RCE.ttl",
         "group": "model",
         "description": "CEO ontology graph.",
+        "queryable": False,
     },
     {
         "key": "triply-owms",
         "uri": "https://triplydb.com/koop/owms/graphs/default",
         "group": "external",
         "description": "External OWMS graph from TriplyDB/KOOP.",
+        "queryable": False,
     },
 ]
+
+# Rijen zonder "queryable"-key zijn standaard query-baar; dit is alleen
+# expliciet False voor de twee rijen hierboven. Eén bron voor zowel de
+# allowlist in config.py (KNOWN_GRAPHS) als de duidelijke notitie die
+# format_graphs() hieronder toont, zodat een graph die hier als "bekend"
+# wordt getoond niet alsnog als onbekend wordt afgewezen door
+# resolve_concept_label(graph_name=...).
+NON_QUERYABLE_GRAPH_KEYS = {
+    row["key"] for row in KNOWN_GRAPH_ROWS if not row.get("queryable", True)
+}
 
 
 def list_graphs() -> list[dict]:
@@ -202,5 +214,13 @@ def format_graphs() -> str:
 
         if row["description"]:
             lines.append(f"  {row['description']}")
+
+        if not row.get("queryable", True):
+            lines.append(
+                "  LET OP: alleen informatief -- niet query-baar via GRAPH <...> "
+                "op het RCE CHO SPARQL-endpoint (en dus ook niet geldig als "
+                "graph_name in resolve_concept_label()); een GRAPH-clause hiertegen "
+                "geeft stil 0 resultaten, zonder foutmelding."
+            )
 
     return "\n".join(lines)

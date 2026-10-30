@@ -409,8 +409,11 @@ def validate_query(sparql_query: str) -> str:
     """Controleert een SPARQL-query op bekende RCE CHO-valkuilen, zonder de
     query uit te voeren: verdachte/niet-bestaande prefixes, een taalgetagd
     label vergelijken met een kale string (zie query_sparql), ORDER BY samen
-    met OPTIONAL (geeft consistent HTTP 504) en cartesisch-productrisico bij
-    meerdere onafhankelijke multi-valued OPTIONAL-blokken.
+    met OPTIONAL (geeft consistent HTTP 504), cartesisch-productrisico bij
+    meerdere onafhankelijke multi-valued OPTIONAL-blokken, en een rijksmonument-/
+    complex-/gezicht-/werelderfgoednummer dat via CONCAT() direct in een
+    CHO-URI-pad wordt geplakt (zie prompts.py: dat padsegment is het interne
+    cultuurhistorischObjectnummer, niet dat nummer).
 
     Valideert geen classes of properties tegen de ontologie -- gebruik
     daarvoor ontology_search()/ontology_describe_class(). Geeft platte tekst
@@ -534,7 +537,7 @@ def grootste_monumenten_oppervlakte(
     brondata. Van de rijksmonumenten met een geometrie is ongeveer 19%
     polygoon/multipolygoon.
 
-    limit: aantal resultaten (1-100, standaard 10).
+    limit: aantal resultaten (1-200, standaard 10).
     class_name: CEO-classnaam om op te filteren (standaard "Rijksmonument",
     bv. ook "ArcheologischTerrein", "Gezicht", "Complex" -- gebruik
     ontology_search() of ontology_describe_class() om classnamen te vinden).
