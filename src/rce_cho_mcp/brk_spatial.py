@@ -82,45 +82,25 @@ verwachten) via de GeoSPARQL-relatie geof:sfIntersects.
 
 from __future__ import annotations
 
-import json
 import re
 import urllib.error
 import urllib.parse
-import urllib.request
 
-from rce_cho_mcp.config import KKG_SPARQL_ENDPOINT, USER_AGENT
-from rce_cho_mcp.sparql import execute_sparql
+from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KKG_SPARQL_ENDPOINT
+from rce_cho_mcp.gemeente import GEMEENTE_SUFFIX_RE as _GEMEENTE_SUFFIX_RE
+from rce_cho_mcp.sparql import escape_sparql_string as _escape_sparql_string
+from rce_cho_mcp.sparql import execute_sparql, post_sparql
+from rce_cho_mcp.sparql import rows as _rows
 
 _KKG_TIMEOUT = 60
 _RCE_TIMEOUT = 30
 _MAX_CANDIDATE_ROWS = 500  # veiligheidslimiet op de KKG-kant, niet de weergavelimiet
 
 _KIND_RE = re.compile(r"^\s*(multipolygon|polygon|point)", re.IGNORECASE)
-_GEMEENTE_SUFFIX_RE = re.compile(r"[_ ]?\(gemeente\)$", re.IGNORECASE)
-
-
-def _rows(data: dict) -> list[dict]:
-    return data.get("results", {}).get("bindings", [])
 
 
 def _post_kkg_sparql(query: str, timeout: int = _KKG_TIMEOUT) -> dict:
-    data = urllib.parse.urlencode({"query": query}).encode("utf-8")
-    request = urllib.request.Request(
-        KKG_SPARQL_ENDPOINT,
-        data=data,
-        headers={
-            "Accept": "application/sparql-results+json",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": USER_AGENT,
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def _escape_sparql_string(text: str) -> str:
-    return text.replace("\\", "\\\\").replace('"', '\\"')
+    return post_sparql(KKG_SPARQL_ENDPOINT, query, timeout=timeout)
 
 
 def _resolve_rijksmonument_uri(identifier: str) -> str | None:
@@ -134,7 +114,7 @@ def _resolve_rijksmonument_uri(identifier: str) -> str | None:
     query = f"""
 PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
 SELECT ?rm WHERE {{
-  GRAPH <https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce> {{
+  GRAPH <{DEFAULT_DATASET_GRAPH}> {{
     ?rm a ceo:Rijksmonument ; ceo:rijksmonumentnummer "{nummer}" .
   }}
 }}

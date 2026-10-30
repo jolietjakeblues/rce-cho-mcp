@@ -38,48 +38,38 @@ from __future__ import annotations
 
 import re
 
+from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH as _INSTANTIES_GRAPH
 from rce_cho_mcp.ontology.registry import get_classes
-from rce_cho_mcp.sparql import execute_sparql
+from rce_cho_mcp.semantics import get_known_value_uris
+from rce_cho_mcp.sparql import escape_sparql_string, execute_sparql
+from rce_cho_mcp.sparql import rows as _sparql_rows
 
 _OWMS_GRAPH = "https://linkeddata.cultureelerfgoed.nl/graph/owms"
-_INSTANTIES_GRAPH = "https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce"
 _GEMEENTE_TYPE_URI = "http://standaarden.overheid.nl/owms/terms/Gemeente"
 _QUERY_TIMEOUT = 60
 
 _MIN_LIMIT = 1
 _MAX_LIMIT = 200
 
-# Zie semantics_describe_topic('legal_status'). Herbruikt als lokale
-# constante (zelfde patroon als _MONUMENT_AARD_URIS in area.py) zodat deze
-# module niet afhankelijk is van de topic-tekststructuur in semantics.py.
-_LEGAL_STATUS_URIS = {
-    "rijksmonument": "https://data.cultureelerfgoed.nl/term/id/rn/2/b2d9a59a-fe1e-4552-9a05-3c2acddff864",
-    "voorbeschermd": "https://data.cultureelerfgoed.nl/term/id/rn/2/2e93edd1-098f-4f31-ae7e-72cb77f4d2ca",
-    "geen rijksmonument": "https://data.cultureelerfgoed.nl/term/id/rn/2/3e79bb7c-b459-4998-a9ed-78d91d069227",
-}
-
-# Zie semantics_describe_topic('monument_aard').
-_MONUMENT_AARD_URIS = {
-    "archeologisch": "https://data.cultureelerfgoed.nl/term/id/rn/2/b673c8c1-5d93-496d-8f9e-89133d579d77",
-    "onroerend gebouwd": "https://data.cultureelerfgoed.nl/term/id/rn/2/fc966a68-8863-4970-a83e-110f96006c21",
-}
+# Eén bron: semantics_describe_topic('legal_status')/('monument_aard') --
+# zie get_known_value_uris() in semantics.py. Ook gebruikt door area.py, zodat
+# deze concept-URI's niet in meerdere modules los gedupliceerd staan.
+_LEGAL_STATUS_URIS = get_known_value_uris("legal_status")
+_MONUMENT_AARD_URIS = get_known_value_uris("monument_aard")
 
 # Normaliseert invoer die de gebruiker soms al in wiki/URI-stijl aanlevert
 # (zie memory rce-monumentadressen-datakwaliteit), bv. "Utrecht (gemeente)".
-_GEMEENTE_SUFFIX_RE = re.compile(r"[_ ]?\(gemeente\)$", re.IGNORECASE)
+# Ook gebruikt door brk_spatial.py (gemeentenaam afgeleid uit een OWMS-URI).
+GEMEENTE_SUFFIX_RE = re.compile(r"[_ ]?\(gemeente\)$", re.IGNORECASE)
 
 
 def _clamp_limit(limit: int) -> int:
     return max(_MIN_LIMIT, min(limit, _MAX_LIMIT))
 
 
-def _escape_sparql_string(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')
-
-
 def _normalize_gemeente_naam(naam: str) -> str:
     naam = naam.strip()
-    return _GEMEENTE_SUFFIX_RE.sub("", naam).strip()
+    return GEMEENTE_SUFFIX_RE.sub("", naam).strip()
 
 
 def resolve_gemeente(naam: str) -> dict:
@@ -98,7 +88,7 @@ def resolve_gemeente(naam: str) -> dict:
     if not schoon:
         return {"error": "Lege gemeentenaam."}
 
-    safe = _escape_sparql_string(schoon)
+    safe = escape_sparql_string(schoon)
     query = f"""
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 SELECT DISTINCT ?concept WHERE {{
@@ -109,8 +99,7 @@ SELECT DISTINCT ?concept WHERE {{
 }}
 """
     data = execute_sparql(query, timeout=_QUERY_TIMEOUT)
-    rows = data.get("results", {}).get("bindings", [])
-    uris = [row["concept"]["value"] for row in rows]
+    uris = [row["concept"]["value"] for row in _sparql_rows(data)]
 
     if not uris:
         return {
@@ -194,7 +183,7 @@ SELECT (COUNT(DISTINCT ?obj) AS ?aantal) WHERE {{
   }}
 }}
 """
-    count_rows = execute_sparql(count_query, timeout=_QUERY_TIMEOUT).get("results", {}).get("bindings", [])
+    count_rows = _sparql_rows(execute_sparql(count_query, timeout=_QUERY_TIMEOUT))
     aantal = int(count_rows[0]["aantal"]["value"]) if count_rows else 0
 
     # Zelfde tweetraps-truc als largest_by_area() in area.py: eerst de
@@ -220,7 +209,7 @@ SELECT DISTINCT ?obj ?rijksmonumentnummer ?naam WHERE {{
   OPTIONAL {{ ?obj ceo:heeftNaam ?nObj . ?nObj ceo:naam ?naam . }}
 }}
 """
-    sample_rows = execute_sparql(sample_query, timeout=_QUERY_TIMEOUT).get("results", {}).get("bindings", [])
+    sample_rows = _sparql_rows(execute_sparql(sample_query, timeout=_QUERY_TIMEOUT))
 
     rows = [
         {

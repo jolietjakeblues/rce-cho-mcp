@@ -1,5 +1,3 @@
-import urllib.error
-
 from mcp.server.fastmcp import FastMCP
 
 from rce_cho_mcp.area import format_largest_by_area, largest_by_area
@@ -17,7 +15,14 @@ from rce_cho_mcp.ontology.api import (
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.resolver import describe_resource, resolve_label
 from rce_cho_mcp.semantics import format_topic, format_topics
-from rce_cho_mcp.sparql import classify_error, execute_sparql, format_results, rd_to_wgs84, to_geojson
+from rce_cho_mcp.sparql import (
+    execute_sparql,
+    format_results,
+    rd_to_wgs84,
+    sparql_dict_errors,
+    sparql_text_errors,
+    to_geojson,
+)
 from rce_cho_mcp.graphs import format_graphs
 from rce_cho_mcp.termennetwerk import lookup_terms, search_terms
 from rce_cho_mcp.validator import format_validation_report, validate_sparql
@@ -59,6 +64,7 @@ def ontology_statistics() -> str:
     )
 
 @mcp.tool()
+@sparql_text_errors()
 def dataset_statistics() -> str:
     """Geef live datasettotalen: triples, entiteiten, klassen en properties.
 
@@ -68,17 +74,11 @@ def dataset_statistics() -> str:
     full-dataset scans (~58 miljoen triples) en kunnen samen ruim een minuut
     duren, soms tot een paar minuten.
     """
-    try:
-        return format_totals(dataset_totals())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout: {type(e).__name__}: {e}"
+    return format_totals(dataset_totals())
 
 
 @mcp.tool()
+@sparql_text_errors()
 def class_instance_counts(only_ceo: bool = True, limit: int = 100) -> str:
     """Telt per klasse het aantal instanties in de live dataset.
 
@@ -91,17 +91,11 @@ def class_instance_counts(only_ceo: bool = True, limit: int = 100) -> str:
     op False om ook infrastructuurklassen te zien (owl:Class, skos:Concept, ...).
     limit: maximum aantal getoonde klassen (1-1000).
     """
-    try:
-        return format_class_partitions(class_partitions(only_ceo=only_ceo, limit=limit))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout: {type(e).__name__}: {e}"
+    return format_class_partitions(class_partitions(only_ceo=only_ceo, limit=limit))
 
 
 @mcp.tool()
+@sparql_text_errors()
 def property_usage_counts(only_ceo: bool = True, limit: int = 100) -> str:
     """Telt per property het aantal triples in de live dataset.
 
@@ -113,17 +107,11 @@ def property_usage_counts(only_ceo: bool = True, limit: int = 100) -> str:
     op False om ook infrastructuurproperties te zien (rdf:type, skos:prefLabel, ...).
     limit: maximum aantal getoonde properties (1-1000).
     """
-    try:
-        return format_property_partitions(property_partitions(only_ceo=only_ceo, limit=limit))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout: {type(e).__name__}: {e}"
+    return format_property_partitions(property_partitions(only_ceo=only_ceo, limit=limit))
 
 
 @mcp.tool()
+@sparql_text_errors()
 def explore_class(class_uri: str, sample_size: int = 1000) -> str:
     """Ontdekt welke predicaten vanaf een klasse vertrekken en waar ze
     naartoe leiden (doelklasse of datatype), op basis van een steekproef
@@ -141,17 +129,11 @@ def explore_class(class_uri: str, sample_size: int = 1000) -> str:
     https://linkeddata.cultureelerfgoed.nl/def/ceo#Rijksmonument
     sample_size: aantal instanties in de steekproef (100-10000).
     """
-    try:
-        return format_class_paths(explore_class_paths(class_uri, sample_size=sample_size))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout: {type(e).__name__}: {e}"
+    return format_class_paths(explore_class_paths(class_uri, sample_size=sample_size))
 
 
 @mcp.tool()
+@sparql_text_errors()
 def explore_incoming(class_uri: str, sample_size: int = 1000) -> str:
     """Ontdekt vanuit welke klassen en via welke predicaten er naar
     instanties van deze klasse wordt verwezen (achteruit navigeren).
@@ -164,14 +146,7 @@ def explore_incoming(class_uri: str, sample_size: int = 1000) -> str:
     class_uri: volledige URI van de te verkennen klasse.
     sample_size: aantal instanties in de steekproef (100-10000).
     """
-    try:
-        return format_incoming_paths(explore_incoming_paths(class_uri, sample_size=sample_size))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout: {type(e).__name__}: {e}"
+    return format_incoming_paths(explore_incoming_paths(class_uri, sample_size=sample_size))
 
 
 @mcp.tool()
@@ -266,6 +241,7 @@ def resolve_gemeente(gemeente: str) -> str:
 
 
 @mcp.tool()
+@sparql_text_errors()
 def monumenten_in_gemeente(
     gemeente: str,
     juridische_status: str = "rijksmonument",
@@ -302,22 +278,15 @@ def monumenten_in_gemeente(
     RCE niet toont, mist deze tool dat monument (zelfde beperking als
     percelen_via_spatial_join()).
     """
-    try:
-        return format_monumenten_in_gemeente(
-            _monumenten_in_gemeente(
-                gemeente,
-                juridische_status=juridische_status,
-                class_name=class_name,
-                monument_aard=monument_aard,
-                limit=limit,
-            )
+    return format_monumenten_in_gemeente(
+        _monumenten_in_gemeente(
+            gemeente,
+            juridische_status=juridische_status,
+            class_name=class_name,
+            monument_aard=monument_aard,
+            limit=limit,
         )
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout: {type(e).__name__}: {e}"
+    )
 
 
 @mcp.tool()
@@ -460,6 +429,7 @@ def validate_query_structured(sparql_query: str) -> dict:
     return validate_sparql(sparql_query)
 
 @mcp.tool()
+@sparql_text_errors(include_body=True)
 def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
     """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint.
 
@@ -492,23 +462,11 @@ def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
     monumenten. validate_query_structured() waarschuwt hiervoor als je een
     query zonder kleine LIMIT met geo:asWKT probeert.
     """
-    try:
-        data = execute_sparql(sparql_query)
-        return format_results(data, max_rows=max_rows)
-
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return (
-            f"[{code}] HTTP {e.code} van {e.url}\n\n"
-            f"Advies: {advies}\n\n"
-            f"Ruwe foutmelding:\n{body[:500]}"
-        )
-
-    except Exception as e:
-        return f"Onverwachte fout: {type(e).__name__}: {e}"
+    data = execute_sparql(sparql_query)
+    return format_results(data, max_rows=max_rows)
 
 @mcp.tool()
+@sparql_dict_errors
 def query_sparql_json(sparql_query: str) -> dict:
     """Voer een SPARQL SELECT of ASK query uit en geef het ruwe JSON-resultaat terug.
 
@@ -519,28 +477,10 @@ def query_sparql_json(sparql_query: str) -> dict:
     halen, of wrap de vergelijking in STR(). Gebruik validate_query_structured()
     om dit patroon vooraf te laten controleren.
     """
-    try:
-        return execute_sparql(sparql_query)
-
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return {
-            "error": code,
-            "status": e.code,
-            "advies": advies,
-            "endpoint": e.url,
-            "body": body[:500],
-        }
-
-    except Exception as e:
-        return {
-            "error": "unexpected_error",
-            "type": type(e).__name__,
-            "message": str(e),
-        }
+    return execute_sparql(sparql_query)
 
 @mcp.tool()
+@sparql_dict_errors
 def query_sparql_geojson(
     sparql_query: str,
     wkt_var: str = "wkt",
@@ -564,29 +504,12 @@ def query_sparql_geojson(
     Gebruik geo:asWKT in de query om geometrieën op te halen. Voeg toe aan de query:
     PREFIX geo: <http://www.opengis.net/ont/geosparql#>
     """
-    try:
-        data = execute_sparql(sparql_query)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return {
-            "error": code,
-            "status": e.code,
-            "advies": advies,
-            "endpoint": e.url,
-            "body": body[:500],
-        }
-    except Exception as e:
-        return {
-            "error": "unexpected_error",
-            "type": type(e).__name__,
-            "message": str(e),
-        }
-
+    data = execute_sparql(sparql_query)
     return to_geojson(data, wkt_var=wkt_var, convert_rd=convert_rd)
 
 
 @mcp.tool()
+@sparql_text_errors()
 def grootste_monumenten_oppervlakte(
     limit: int = 10, class_name: str = "Rijksmonument", monument_aard: str | None = None
 ) -> str:
@@ -626,16 +549,9 @@ def grootste_monumenten_oppervlakte(
     ~1.499 archeologische of ~61.500 onroerend-gebouwde rijksmonumenten)
     overschrijdt ruwe WKT al snel de tool-resultaatlimiet (zie query_sparql()).
     """
-    try:
-        return format_largest_by_area(
-            largest_by_area(limit=limit, class_name=class_name, monument_aard=monument_aard)
-        )
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        code, advies = classify_error(body, e.code)
-        return f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
-    except Exception as e:
-        return f"Onverwachte fout: {type(e).__name__}: {e}"
+    return format_largest_by_area(
+        largest_by_area(limit=limit, class_name=class_name, monument_aard=monument_aard)
+    )
 
 
 @mcp.tool()

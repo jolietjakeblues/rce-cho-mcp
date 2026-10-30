@@ -1,6 +1,11 @@
 import re
 
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH
+from rce_cho_mcp.pitfalls import (
+    CARTESIAN_PRODUCT_WARNING,
+    LANGUAGE_TAG_WARNING,
+    TWO_STAGE_SUBQUERY_REMEDY,
+)
 
 
 FORBIDDEN_PREFIXES = [
@@ -75,13 +80,7 @@ def _find_order_by_optional_timeout_risk(query: str) -> list[str]:
         return []
     if not OPTIONAL_BLOCK_PATTERN.search(query):
         return []
-    return [
-        "ORDER BY gecombineerd met OPTIONAL-joins veroorzaakt op dit endpoint "
-        "consistent een HTTP 504 timeout, ook met een kleine LIMIT. Gebruik een "
-        "tweetraps-subquery: sorteer/pagineer eerst goedkoop op een enkele "
-        "variabele in een binnenste SELECT DISTINCT, en voeg de duurdere "
-        "OPTIONAL-joins pas toe in de buitenste query op de al-beperkte set."
-    ]
+    return [TWO_STAGE_SUBQUERY_REMEDY]
 
 
 def _find_cartesian_product_risk(query: str) -> list[str]:
@@ -97,16 +96,7 @@ def _find_cartesian_product_risk(query: str) -> list[str]:
     count = len(OPTIONAL_BLOCK_PATTERN.findall(query))
     if count < 2:
         return []
-    return [
-        f"{count} OPTIONAL-blokken gevonden in dezelfde query. Als dit "
-        "onafhankelijke multi-valued relaties zijn (bv. meerdere BRK-percelen "
-        "EN meerdere BAG-adressen), levert dit een cartesisch product op "
-        "(aantal_a x aantal_b rijen i.p.v. aantal_a + aantal_b losse feiten), "
-        "inclusief onzinnige combinaties. Haal multi-valued relaties die niet "
-        "inherent aan elkaar gekoppeld zijn op in aparte queries (evt. met een "
-        "gedeelde VALUES-clause) en combineer ze in code, niet als losse "
-        "OPTIONAL-blokken in dezelfde SELECT."
-    ]
+    return [f"{count} OPTIONAL-blokken gevonden in dezelfde query. {CARTESIAN_PRODUCT_WARNING}"]
 
 
 def _find_untyped_numeric_literal_risk(query: str) -> list[str]:
@@ -246,12 +236,7 @@ def _find_unsafe_label_filters(query: str) -> list[str]:
 
             warnings.append(
                 f"FILTER gebruikt ?{var}, dat gebonden is via skos:prefLabel, "
-                "zonder STR(). Labels zijn vaak taalgetagd (bv. \"Zwolle\"@nl); "
-                f"een vergelijking als FILTER(?{var} = \"...\") of "
-                f"FILTER(?{var} IN (...)) matcht dan niets en geeft stil 0 "
-                f"resultaten. Gebruik STR(?{var}) = \"...\", of resolveer het "
-                "label eerst naar een URI met resolve_concept_label() en "
-                "filter/join op die URI in plaats van op de labeltekst."
+                f"zonder STR(). {LANGUAGE_TAG_WARNING}"
             )
 
     return warnings

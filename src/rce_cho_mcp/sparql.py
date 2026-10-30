@@ -1,3 +1,4 @@
+import functools
 import json
 import re
 import urllib.error
@@ -5,13 +6,42 @@ import urllib.parse
 import urllib.request
 
 from rce_cho_mcp.config import SPARQL_ENDPOINT, SPARQL_FALLBACK_ENDPOINT, USER_AGENT
+from rce_cho_mcp.pitfalls import TWO_STAGE_SUBQUERY_REMEDY
 
 # Gateway-level codes that mean "this endpoint instance is having trouble",
 # as opposed to a 4xx that reflects a problem with the query itself.
 _FALLBACK_HTTP_CODES = {502, 503, 504}
 
 
-def _post_sparql(endpoint: str, data: bytes, timeout: int) -> dict:
+def escape_sparql_string(value: str) -> str:
+    """Escape a string value for safe use in a SPARQL string literal.
+
+    Single shared implementation -- used by every module that interpolates
+    user input (a label, gemeente name, rijksmonumentnummer, WKT literal)
+    into a hand-built SPARQL query string.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def rows(data: dict) -> list[dict]:
+    """Return the SPARQL JSON result bindings, or [] if there are none.
+
+    Single shared accessor for data["results"]["bindings"], used everywhere
+    a SPARQL JSON response is read.
+    """
+    return data.get("results", {}).get("bindings", [])
+
+
+def post_sparql(endpoint: str, query: str, timeout: int = 30) -> dict:
+    """POST a single SPARQL query to one endpoint and return the JSON response.
+
+    No retry/fallback across endpoints -- execute_sparql() builds that on top
+    of this for the default RCE endpoints. Exposed directly for callers that
+    talk to a different, single SPARQL endpoint (e.g. brk_spatial.py's
+    Kadaster KKG queries), so they don't have to reimplement the HTTP/encoding
+    details themselves.
+    """
+    data = urllib.parse.urlencode({"query": query}).encode("utf-8")
     request = urllib.request.Request(
         endpoint,
         data=data,
@@ -42,8 +72,6 @@ def execute_sparql(query: str, timeout: int = 30) -> dict:
     A query-level error (e.g. a 4xx syntax error) is not retried on the
     fallback, since the same query would fail there identically.
     """
-    data = urllib.parse.urlencode({"query": query}).encode("utf-8")
-
     endpoints = [SPARQL_ENDPOINT]
     if SPARQL_FALLBACK_ENDPOINT and SPARQL_FALLBACK_ENDPOINT != SPARQL_ENDPOINT:
         endpoints.append(SPARQL_FALLBACK_ENDPOINT)
@@ -52,7 +80,7 @@ def execute_sparql(query: str, timeout: int = 30) -> dict:
         is_last_attempt = index == len(endpoints) - 1
 
         try:
-            return _post_sparql(endpoint, data, timeout)
+            return post_sparql(endpoint, query, timeout)
         except urllib.error.HTTPError as e:
             if not is_last_attempt and e.code in _FALLBACK_HTTP_CODES:
                 continue
@@ -79,10 +107,8 @@ def classify_error(body: str, http_code: int) -> tuple[str, str]:
             "Het endpoint heeft de query afgebroken wegens een tijdslimiet "
             f"(HTTP {http_code}; een 504 van de gateway bevat vaak geen 'timeout' "
             "in de body). Voeg een LIMIT toe, verklein het bereik, of splits de query op. "
-            "Combineert de query ORDER BY met OPTIONAL-joins? Gebruik dan een "
-            "tweetraps-subquery: sorteer/pagineer eerst goedkoop op een enkele variabele "
-            "in een binnenste SELECT DISTINCT, en voeg de duurdere OPTIONAL-joins pas toe "
-            "in de buitenste query op de al-beperkte set. Zie validate_query_structured().",
+            f"Combineert de query ORDER BY met OPTIONAL-joins? {TWO_STAGE_SUBQUERY_REMEDY} "
+            "Zie validate_query_structured().",
         )
     if "sparql compiler" in b or "sp029" in b or "syntax" in b:
         return (
@@ -98,12 +124,70 @@ def classify_error(body: str, http_code: int) -> tuple[str, str]:
     return ("HTTP_ERROR", f"HTTP {http_code}: onbekende fout van het endpoint.")
 
 
+def sparql_text_errors(include_body: bool = False):
+    """Decorator for an @mcp.tool() that returns str.
+
+    Catches urllib.error.HTTPError and any other exception and formats them
+    the same way every such tool does (classify_error() + a consistent Dutch
+    foutmelding), instead of each tool in server.py repeating the same
+    try/except block.
+
+    include_body: when True, append the raw error body (truncated) to the
+    message -- used by query_sparql(), which shows it for debugging.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")
+                code, advies = classify_error(body, e.code)
+                text = f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+                if include_body:
+                    text += f"\n\nRuwe foutmelding:\n{body[:500]}"
+                return text
+            except Exception as e:
+                return f"Onverwachte fout: {type(e).__name__}: {e}"
+
+        return wrapper
+
+    return decorator
+
+
+def sparql_dict_errors(func):
+    """Same as sparql_text_errors(), for an @mcp.tool() that returns a dict."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            code, advies = classify_error(body, e.code)
+            return {
+                "error": code,
+                "status": e.code,
+                "advies": advies,
+                "endpoint": e.url,
+                "body": body[:500],
+            }
+        except Exception as e:
+            return {
+                "error": "unexpected_error",
+                "type": type(e).__name__,
+                "message": str(e),
+            }
+
+    return wrapper
+
+
 def format_results(data: dict, max_rows: int = 100) -> str:
     """Format SPARQL JSON results as readable text."""
     if "boolean" in data:
         return f"Resultaat: {data['boolean']}"
 
-    bindings = data.get("results", {}).get("bindings", [])
+    bindings = rows(data)
     variables = data.get("head", {}).get("vars", [])
 
     if not bindings:
@@ -302,7 +386,7 @@ def to_geojson(data: dict, wkt_var: str = "wkt", convert_rd: bool = False) -> di
     All other variables become feature properties.
     Rows without a valid geometry are skipped.
     """
-    bindings = data.get("results", {}).get("bindings", [])
+    bindings = rows(data)
     variables = data.get("head", {}).get("vars", [])
     prop_vars = [v for v in variables if v != wkt_var]
 

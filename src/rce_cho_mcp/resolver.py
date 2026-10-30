@@ -1,16 +1,12 @@
 import urllib.error
 
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KNOWN_GRAPHS
-from rce_cho_mcp.sparql import execute_sparql
+from rce_cho_mcp.pitfalls import LANGUAGE_TAG_WARNING
+from rce_cho_mcp.sparql import escape_sparql_string, execute_sparql, rows
 
 
 PREFIXES = """PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 """
-
-
-def _escape_sparql_string(value: str) -> str:
-    """Escape a string value for safe use in a SPARQL string literal."""
-    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _validate_graph_name(graph_name: str) -> None:
@@ -27,22 +23,14 @@ def resolve_label(
     graph_name: str = "owms",
     lang: str = "nl",
 ) -> list[dict]:
-    """Resolve a SKOS prefLabel in a named graph to all matching concepts.
+    """Resolveer een SKOS prefLabel in een named graph naar alle matchende concepten.
 
-    Returns every match with its URI and type(s). The caller decides which
-    result is relevant. The resolver does not guess.
-
-    IMPORTANT: prefLabel values in this dataset are language-tagged
-    (e.g. "Zwolle"@nl). Do not filter or match on skos:prefLabel strings
-    directly in hand-written SPARQL (e.g. FILTER(?label = "Zwolle") or
-    FILTER(?label IN (...))) — a plain string literal will not match a
-    language-tagged RDF term and the query will silently return zero
-    results. Call this resolver first to get the concept URI, then filter
-    or join on that URI instead of on the label text.
+    Geeft elke match terug met zijn URI en type(s). De aanroeper beslist welk
+    resultaat relevant is; deze resolver gokt niet.
     """
     _validate_graph_name(graph_name)
 
-    safe_label = _escape_sparql_string(label)
+    safe_label = escape_sparql_string(label)
     graph_uri = KNOWN_GRAPHS[graph_name]
 
     query = f"""{PREFIXES}
@@ -68,7 +56,7 @@ WHERE {{
             f"Fout bij resolven van label '{label}': {type(e).__name__}: {e}"
         ) from e
 
-    bindings = data.get("results", {}).get("bindings", [])
+    bindings = rows(data)
 
     results: dict[str, dict] = {}
 
@@ -90,6 +78,18 @@ WHERE {{
                 entry["types"].append(type_uri)
 
     return list(results.values())
+
+
+# Opgebouwd uit de gedeelde constante in pitfalls.py in plaats van een eigen
+# kopie van deze waarschuwing (zie ook server.py's resolve_concept_label(),
+# query_sparql() en validator.py, die dezelfde constante gebruiken).
+resolve_label.__doc__ += f"""
+
+    BELANGRIJK: {LANGUAGE_TAG_WARNING} Gebruik deze resolver eerst om de
+    concept-URI op te halen, en filter of join daarna op die URI in plaats
+    van op de labeltekst.
+    """
+
 
 def describe_resource(
     uri: str,
@@ -116,7 +116,7 @@ WHERE {{
             f"Fout bij opvragen van resource '{uri}': {type(e).__name__}: {e}"
         ) from e
 
-    bindings = data.get("results", {}).get("bindings", [])
+    bindings = rows(data)
 
     return [
         {
