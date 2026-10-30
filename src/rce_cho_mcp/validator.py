@@ -56,6 +56,18 @@ UNTYPED_NUMERIC_LITERAL_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Detecteert het plakken van een rijksmonument-/complex-/gezicht-/
+# werelderfgoednummer direct in een CHO-URI-pad via CONCAT() (zie
+# _find_monument_uri_concat_risk). Vangt niet de legitieme variant die naar
+# het publieke monumentenregister linkt (die domeinnaam wordt in de match
+# zelf uitgesloten, zie SAFE_REGISTER_DOMAIN hieronder).
+MONUMENT_URI_CONCAT_PATTERN = re.compile(
+    r'CONCAT\(\s*"([^"]*?)(rijksmonument|complex|gezicht|werelderfgoed)/"\s*,\s*\?(\w*nummer)\b',
+    re.IGNORECASE,
+)
+
+SAFE_REGISTER_DOMAIN = "monumentenregister.cultureelerfgoed.nl"
+
 # Detecteert een variabele gebonden via geo:asWKT (polygoongeometrie kan
 # duizenden tekens per rij zijn -- zie _find_large_wkt_result_risk).
 WKT_BINDING_PATTERN = re.compile(r"geo:asWKT\s+\?(\w+)", re.IGNORECASE)
@@ -72,9 +84,11 @@ def _find_order_by_optional_timeout_risk(query: str) -> list[str]:
     """Detecteer ORDER BY gecombineerd met OPTIONAL-joins.
 
     Bevestigd (2026-07): dit combinatiepatroon veroorzaakt consistent een
-    HTTP 504 op het Virtuoso-endpoint, zelfs met een kleine LIMIT -- de
-    triplestore lijkt eerst de volledige gejoinde resultatenset te sorteren
-    voordat LIMIT/OFFSET wordt toegepast.
+    HTTP 504 op dit endpoint, zelfs met een kleine LIMIT -- de triplestore
+    lijkt eerst de volledige gejoinde resultatenset te sorteren voordat
+    LIMIT/OFFSET wordt toegepast. Niet opnieuw per-endpoint geverifieerd
+    tussen SPARQL_ENDPOINT ("Speedy") en SPARQL_FALLBACK_ENDPOINT
+    ("Virtuoso") -- zie config.py.
     """
     if "ORDER BY" not in query.upper():
         return []
@@ -97,6 +111,35 @@ def _find_cartesian_product_risk(query: str) -> list[str]:
     if count < 2:
         return []
     return [f"{count} OPTIONAL-blokken gevonden in dezelfde query. {CARTESIAN_PRODUCT_WARNING}"]
+
+
+def _find_monument_uri_concat_risk(query: str) -> list[str]:
+    """Detecteer het plakken van een rijksmonument-/complex-/gezicht-/
+    werelderfgoednummer direct in een CHO-URI-pad via CONCAT().
+
+    Bevestigd (zie prompts.py): het numerieke padsegment in een URI als
+    .../rijksmonument/{N} is het interne cultuurhistorischObjectnummer, niet
+    het rijksmonumentnummer -- deze twee nummers verschillen meestal, en de
+    fout geeft geen foutmelding, alleen het verkeerde monument (bevestigd:
+    rijksmonumentnummer "16388" hoort bij .../rijksmonument/31287). Vlagt
+    niet de legitieme variant die naar het publieke monumentenregister
+    linkt (monumentenregister.cultureelerfgoed.nl), alleen een CONCAT die
+    een eigen CHO-linked-data-URI opbouwt.
+    """
+    warnings = []
+    for match in MONUMENT_URI_CONCAT_PATTERN.finditer(query):
+        literal_prefix, segment, var = match.groups()
+        if SAFE_REGISTER_DOMAIN in literal_prefix.lower():
+            continue
+        warnings.append(
+            f'CONCAT bouwt een URI-pad ".../{segment}/" op door ?{var} direct '
+            "achter de padnaam te plakken. Het numerieke padsegment in zo'n "
+            "URI is het interne cultuurhistorischObjectnummer, niet het "
+            f"{var} -- deze twee nummers verschillen meestal, en de fout "
+            "geeft geen foutmelding, alleen het verkeerde monument. Filter "
+            f"in plaats daarvan op ceo:{var} en laat de query de URI opzoeken."
+        )
+    return warnings
 
 
 def _find_untyped_numeric_literal_risk(query: str) -> list[str]:
@@ -123,14 +166,14 @@ def _find_untyped_numeric_literal_risk(query: str) -> list[str]:
 
 
 def _find_geosparql_timeout_risk(query: str) -> list[str]:
-    """Detecteer GeoSPARQL-relaties die structureel timeout veroorzaken op Virtuoso."""
+    """Detecteer GeoSPARQL-relaties die structureel timeout veroorzaken op dit endpoint."""
     matches = GEOSPARQL_RELATIONS.findall(query)
     if not matches:
         return []
     found = ", ".join(set(matches))
     return [
         f"Gevonden: {found}. Ruimtelijke joins met geof:sfWithin e.d. lopen "
-        "structureel vast op dit Virtuoso-endpoint (timeout). "
+        "structureel vast op dit endpoint (timeout). "
         "Gebruik een tweetraps-aanpak: haal WKT-geometrieën eerst op via query_sparql(), "
         "voer de ruimtelijke join daarna lokaal uit (bijv. met Shapely in Python). "
         "Zie ook: semantics_describe_topic('geometry')."
@@ -269,6 +312,7 @@ def validate_sparql(query: str) -> dict:
             )
 
     warnings.extend(_find_unsafe_label_filters(q))
+    warnings.extend(_find_monument_uri_concat_risk(q))
     warnings.extend(_find_large_wkt_result_risk(q))
     warnings.extend(_find_groupby_overflow_risk(q))
     warnings.extend(_find_geosparql_timeout_risk(q))

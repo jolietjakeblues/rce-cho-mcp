@@ -10,9 +10,12 @@ GeoSPARQL-functie geof:area() op de hoofdgeometrie (ceo:heeftGeometrie ->
 geo:asWKT), voor de subset monumenten die daar een POLYGON/MULTIPOLYGON
 (i.p.v. een POINT) hebben staan.
 
-Geverifieerd tegen het live endpoint (2026-09-03):
-- geof:area(?wkt, uom:metre) is beschikbaar op dit Virtuoso-endpoint en
-  verwacht *twee* argumenten (de wkt-literal en een eenheid-URI) -- met één
+Geverifieerd tegen het live endpoint (2026-09-03, herbevestigd 2026-10-30):
+- geof:area(?wkt, uom:metre) is beschikbaar op het standaard SPARQL-endpoint
+  (SPARQL_ENDPOINT in config.py, bijnaam "Speedy") -- NIET op het fallback-
+  endpoint met bijnaam "Virtuoso" (CHO_SERVICE_ENDPOINT), dat voor deze
+  functie HTTP 400 "Unknown function ...geosparql/area()" geeft. Verwacht
+  *twee* argumenten (de wkt-literal en een eenheid-URI) -- met één
   argument geeft het endpoint HTTP 400 "Expected 2 argument, but got 1".
   Met uom:metre levert het een geodetische oppervlakte in vierkante meters,
   direct uit WGS84-coordinaten (getest op een 1x1 graad vierkant nabij de
@@ -45,6 +48,7 @@ Geverifieerd tegen het live endpoint (2026-09-03):
 """
 
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH as _INSTANTIES_GRAPH
+from rce_cho_mcp.limits import LIST_MAX_LIMIT
 from rce_cho_mcp.ontology.registry import get_classes
 from rce_cho_mcp.semantics import get_known_value_uris
 from rce_cho_mcp.sparql import execute_sparql
@@ -54,7 +58,7 @@ _DEFAULT_CLASS = "Rijksmonument"
 _QUERY_TIMEOUT = 60
 
 _MIN_LIMIT = 1
-_MAX_LIMIT = 100
+_MAX_LIMIT = LIST_MAX_LIMIT
 
 # Eén bron: semantics_describe_topic('monument_aard') -- zie
 # get_known_value_uris() in semantics.py. Ook gebruikt door gemeente.py,
