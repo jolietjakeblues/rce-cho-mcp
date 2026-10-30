@@ -35,7 +35,8 @@ classifiers = [
 
 dependencies = [
   "mcp>=1.27,<2",
-  "rdflib>=7.0.0,<8"
+  "rdflib>=7.0.0,<8",
+  "pydantic>=2.0,<3"
 ]
 
 [project.optional-dependencies]
@@ -63,6 +64,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-ra"
+asyncio_mode = "auto"
 
 [tool.ruff]
 target-version = "py311"

@@ -1,11 +1,17 @@
-from mcp.server.fastmcp import FastMCP
+from typing import Annotated
+
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import Field
 
 from rce_cho_mcp.area import format_largest_by_area, largest_by_area
+from rce_cho_mcp.brk_spatial import _MAX_CANDIDATE_ROWS
 from rce_cho_mcp.brk_spatial import format_percelen_via_spatial_join
 from rce_cho_mcp.brk_spatial import percelen_via_spatial_join as _percelen_via_spatial_join
 from rce_cho_mcp.gemeente import format_monumenten_in_gemeente
 from rce_cho_mcp.gemeente import monumenten_in_gemeente as _monumenten_in_gemeente
 from rce_cho_mcp.gemeente import resolve_gemeente as _resolve_gemeente
+from rce_cho_mcp.config import MASS_SPARQL_ENDPOINT
+from rce_cho_mcp.limits import LIST_MAX_LIMIT
 from rce_cho_mcp.ontology.api import (
     describe_class,
     describe_property,
@@ -18,6 +24,7 @@ from rce_cho_mcp.semantics import format_topic, format_topics
 from rce_cho_mcp.sparql import (
     execute_sparql,
     format_results,
+    post_sparql,
     rd_to_wgs84,
     sparql_dict_errors,
     sparql_text_errors,
@@ -43,17 +50,17 @@ from rce_cho_mcp.stats import (
 mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def ping() -> str:
     """Test of de MCP-server bereikbaar is."""
     return "RCE CHO MCP werkt."
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def graphs_list() -> str:
     """Toon bekende CHO named graphs."""
     return format_graphs()
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def ontology_statistics() -> str:
     """Geef statistieken over de ingelezen CEO-ontologie."""
     stats = statistics()
@@ -63,23 +70,28 @@ def ontology_statistics() -> str:
         f"Properties: {stats['properties']}"
     )
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_text_errors()
-def dataset_statistics() -> str:
+async def dataset_statistics(ctx: Context) -> str:
     """Geef live datasettotalen: triples, entiteiten, klassen en properties.
 
     In tegenstelling tot ontology_statistics() (telt wat er in het gebundelde
     ontologiebestand is gedefinieerd) telt dit wat er daadwerkelijk in de
     live, dagelijks ververste data staat. Dit zijn vier opeenvolgende
     full-dataset scans (~58 miljoen triples) en kunnen samen ruim een minuut
-    duren, soms tot een paar minuten.
+    duren, soms tot een paar minuten -- deze tool rapporteert daarom
+    voortgang (via ctx.report_progress()) na elke van de vier deelqueries,
+    zodat een client kan tonen dat er nog gewerkt wordt.
     """
-    return format_totals(dataset_totals())
+    return format_totals(await dataset_totals(on_step=ctx.report_progress))
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_text_errors()
-def class_instance_counts(only_ceo: bool = True, limit: int = 100) -> str:
+def class_instance_counts(
+    only_ceo: bool = True,
+    limit: Annotated[int, Field(ge=1, le=1000)] = 100,
+) -> str:
     """Telt per klasse het aantal instanties in de live dataset.
 
     Toont ook welke ontologieklassen NIET in de data voorkomen: klassen die
@@ -94,9 +106,12 @@ def class_instance_counts(only_ceo: bool = True, limit: int = 100) -> str:
     return format_class_partitions(class_partitions(only_ceo=only_ceo, limit=limit))
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_text_errors()
-def property_usage_counts(only_ceo: bool = True, limit: int = 100) -> str:
+def property_usage_counts(
+    only_ceo: bool = True,
+    limit: Annotated[int, Field(ge=1, le=1000)] = 100,
+) -> str:
     """Telt per property het aantal triples in de live dataset.
 
     Properties met lage aantallen zijn dun gevuld -- relevant om in te
@@ -110,9 +125,12 @@ def property_usage_counts(only_ceo: bool = True, limit: int = 100) -> str:
     return format_property_partitions(property_partitions(only_ceo=only_ceo, limit=limit))
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_text_errors()
-def explore_class(class_uri: str, sample_size: int = 1000) -> str:
+def explore_class(
+    class_uri: str,
+    sample_size: Annotated[int, Field(ge=100, le=10_000)] = 1000,
+) -> str:
     """Ontdekt welke predicaten vanaf een klasse vertrekken en waar ze
     naartoe leiden (doelklasse of datatype), op basis van een steekproef
     van instanties.
@@ -132,9 +150,12 @@ def explore_class(class_uri: str, sample_size: int = 1000) -> str:
     return format_class_paths(explore_class_paths(class_uri, sample_size=sample_size))
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_text_errors()
-def explore_incoming(class_uri: str, sample_size: int = 1000) -> str:
+def explore_incoming(
+    class_uri: str,
+    sample_size: Annotated[int, Field(ge=100, le=10_000)] = 1000,
+) -> str:
     """Ontdekt vanuit welke klassen en via welke predicaten er naar
     instanties van deze klasse wordt verwezen (achteruit navigeren).
 
@@ -149,7 +170,7 @@ def explore_incoming(class_uri: str, sample_size: int = 1000) -> str:
     return format_incoming_paths(explore_incoming_paths(class_uri, sample_size=sample_size))
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def ontology_search(term: str) -> str:
     """Zoek classes en properties in de CEO-ontologie op naam/trefwoord.
 
@@ -161,27 +182,27 @@ def ontology_search(term: str) -> str:
     return search_ontology(term)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def ontology_describe_class(class_name: str) -> str:
     """Beschrijf een CEO-class op basis van de ingelezen ontologie."""
     return describe_class(class_name)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def ontology_describe_property(property_name: str) -> str:
     """Beschrijf een CEO-property op basis van de ingelezen ontologie."""
     return describe_property(property_name)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def semantics_list_topics() -> str:
     """Toon beschikbare dataset-semantiek onderwerpen."""
     return format_topics()
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def semantics_describe_topic(topic: str) -> str:
     """Geef interpretatieregels voor een dataset-semantiek onderwerp."""
     return format_topic(topic)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl") -> str:
     """Resolveer een SKOS prefLabel in een specifieke named graph.
 
@@ -213,7 +234,7 @@ def resolve_concept_label(label: str, graph_name: str = "owms", lang: str = "nl"
 
     return "\n".join(lines)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def resolve_gemeente(gemeente: str) -> str:
     """Resolveer een gemeentenaam naar zijn OWMS concept-URI.
 
@@ -240,14 +261,14 @@ def resolve_gemeente(gemeente: str) -> str:
     return f"{result['naam']}: {result['uri']}"
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_text_errors()
 def monumenten_in_gemeente(
     gemeente: str,
     juridische_status: str = "rijksmonument",
     class_name: str = "Rijksmonument",
     monument_aard: str | None = None,
-    limit: int = 50,
+    limit: Annotated[int, Field(ge=1, le=LIST_MAX_LIMIT)] = 50,
 ) -> str:
     """Tel en toon monumenten in een gemeente, met automatische
     gemeente-resolutie, de juiste graph en een standaard
@@ -289,12 +310,12 @@ def monumenten_in_gemeente(
     )
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def zoek_concept_termennetwerk(
     term: str,
     sources: list[str] | None = None,
     genres: list[str] | None = None,
-    max_resultaten: int = 25,
+    max_resultaten: Annotated[int, Field(ge=1, le=100)] = 25,
 ) -> str:
     """Zoek SKOS-concepten op natuurlijke taal via het NDE Termennetwerk (Network of Terms).
 
@@ -352,7 +373,7 @@ def zoek_concept_termennetwerk(
 
     return "\n".join(lines)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def lookup_termennetwerk_uri(uris: list[str]) -> str:
     """Vertaal een of meer externe concept-URI's terug naar leesbare labels, via het
     NDE Termennetwerk.
@@ -388,7 +409,7 @@ def lookup_termennetwerk_uri(uris: list[str]) -> str:
 
     return "\n".join(lines)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def describe_resource_uri(uri: str) -> str:
     """Beschrijf een resource: alle predicaten en waarden van een URI in de RCE-graph."""
     try:
@@ -404,7 +425,7 @@ def describe_resource_uri(uri: str) -> str:
 
     return "\n".join(lines)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def validate_query(sparql_query: str) -> str:
     """Controleert een SPARQL-query op bekende RCE CHO-valkuilen, zonder de
     query uit te voeren: verdachte/niet-bestaande prefixes, een taalgetagd
@@ -422,7 +443,7 @@ def validate_query(sparql_query: str) -> str:
     """
     return format_validation_report(sparql_query)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def validate_query_structured(sparql_query: str) -> dict:
     """Zelfde controles als validate_query(), maar als
     {"valid": bool, "errors": [...], "warnings": [...]} in plaats van platte
@@ -431,9 +452,12 @@ def validate_query_structured(sparql_query: str) -> dict:
     """
     return validate_sparql(sparql_query)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_text_errors(include_body=True)
-def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
+def query_sparql(
+    sparql_query: str,
+    max_rows: Annotated[int, Field(ge=1, le=10_000)] = 100,
+) -> str:
     """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint.
 
     Let op: skos:prefLabel-waarden zijn taalgetagd (bv. "Zwolle"@nl). Een
@@ -468,7 +492,7 @@ def query_sparql(sparql_query: str, max_rows: int = 100) -> str:
     data = execute_sparql(sparql_query)
     return format_results(data, max_rows=max_rows)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_dict_errors
 def query_sparql_json(sparql_query: str) -> dict:
     """Voer een SPARQL SELECT of ASK query uit en geef het ruwe JSON-resultaat terug.
@@ -482,7 +506,7 @@ def query_sparql_json(sparql_query: str) -> dict:
     """
     return execute_sparql(sparql_query)
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_dict_errors
 def query_sparql_geojson(
     sparql_query: str,
@@ -511,10 +535,43 @@ def query_sparql_geojson(
     return to_geojson(data, wkt_var=wkt_var, convert_rd=convert_rd)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+@sparql_text_errors()
+def query_sparql_mass(
+    sparql_query: str,
+    max_rows: Annotated[int, Field(ge=1, le=10_000)] = 100,
+) -> str:
+    """Voer een SPARQL SELECT of ASK query uit op het RCE MASS-endpoint
+    (maritiem erfgoed: scheepswrakken wereldwijd).
+
+    Gebruik deze tool, niet query_sparql(), voor vragen over scheepswrakken,
+    maritiem erfgoed, VOC-schepen of andere historische vaartuigen --
+    MASS is een apart dataset/endpoint met een eigen vocabulaire, los van de
+    CEO-ontologie en het CHO-endpoint die de rest van deze server bedient.
+    Raadpleeg eerst semantics_describe_topic('maritime') voor de querypaden
+    (sdo:Vehicle/Place/GeoCoordinates) voordat je zelf een pad verzint --
+    dezelfde regel als voor het CHO-endpoint, nu voor een andere ontologie.
+
+    Deze tool heeft geen eigen validate_query()-achtige voorcontrole en geen
+    Speedy/Virtuoso-fallback (zie query_sparql() voor die twee kenmerken op
+    het CHO-endpoint) -- MASS is één los endpoint zonder de gedocumenteerde
+    CHO-valkuilen. De generieke validate_query()-controles (SELECT/WHERE-
+    volgorde, COUNT-alias) blijven wel nuttig; de CHO-specifieke controles
+    (ceo:-prefixes, skos:prefLabel-taalfilter) zijn hier niet van toepassing.
+
+    max_rows: zie query_sparql() -- beperkt alleen de weergave, niet wat de
+    query zelf ophaalt; zet ook in de SPARQL-query zelf een LIMIT.
+    """
+    data = post_sparql(MASS_SPARQL_ENDPOINT, sparql_query)
+    return format_results(data, max_rows=max_rows)
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_text_errors()
 def grootste_monumenten_oppervlakte(
-    limit: int = 10, class_name: str = "Rijksmonument", monument_aard: str | None = None
+    limit: Annotated[int, Field(ge=1, le=LIST_MAX_LIMIT)] = 10,
+    class_name: str = "Rijksmonument",
+    monument_aard: str | None = None,
 ) -> str:
     """Vind de monumenten met de grootste oppervlakte, berekend uit hun polygoongeometrie.
 
@@ -557,8 +614,11 @@ def grootste_monumenten_oppervlakte(
     )
 
 
-@mcp.tool()
-def percelen_via_spatial_join(rijksmonument: str, limit: int = 20) -> str:
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+def percelen_via_spatial_join(
+    rijksmonument: str,
+    limit: Annotated[int, Field(ge=1, le=_MAX_CANDIDATE_ROWS)] = 20,
+) -> str:
     """Vind alle kadastrale percelen die een rijksmonument daadwerkelijk
     overlapt, via een echte spatial join met het Kadaster KKG-endpoint --
     onafhankelijk van RCE's eigen BRK-relatie.
@@ -599,7 +659,7 @@ def percelen_via_spatial_join(rijksmonument: str, limit: int = 20) -> str:
     return format_percelen_via_spatial_join(_percelen_via_spatial_join(rijksmonument, limit=limit))
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def convert_rd_to_wgs84(x: float, y: float) -> dict:
     """Converteer een enkel RD New (EPSG:28992) coördinatenpaar naar WGS84.
 
@@ -610,6 +670,98 @@ def convert_rd_to_wgs84(x: float, y: float) -> dict:
     """
     lon, lat = rd_to_wgs84(x, y)
     return {"lon": lon, "lat": lat}
+
+
+# ---------------------------------------------------------------------------
+# Resources: statische referentiedata (geen SPARQL-call, geen argumenten op
+# de twee eerste) die een client kan browsen/aanhechten zonder een tool aan
+# te roepen -- hetzelfde onderliggende materiaal als graphs_list(),
+# ontology_statistics(), semantics_list_topics() en semantics_describe_topic(),
+# nu ook bereikbaar als MCP Resource i.p.v. uitsluitend als Tool.
+# ---------------------------------------------------------------------------
+
+
+@mcp.resource(
+    "rce-cho://graphs",
+    name="CHO-KENNIS graphs",
+    description="Bekende named graphs op het RCE CHO SPARQL-endpoint.",
+    mime_type="text/plain",
+)
+def graphs_resource() -> str:
+    return format_graphs()
+
+
+@mcp.resource(
+    "rce-cho://ontology/statistics",
+    name="CEO-ontologie statistieken",
+    description="Aantal classes en properties in de gebundelde CEO-ontologie.",
+    mime_type="text/plain",
+)
+def ontology_statistics_resource() -> str:
+    stats = statistics()
+    return f"Classes: {stats['classes']}\nProperties: {stats['properties']}"
+
+
+@mcp.resource(
+    "rce-cho://semantics/topics",
+    name="Dataset-semantiek topics",
+    description="Overzicht van beschikbare dataset-semantiek topics.",
+    mime_type="text/plain",
+)
+def semantics_topics_resource() -> str:
+    return format_topics()
+
+
+@mcp.resource(
+    "rce-cho://semantics/{topic}",
+    name="Dataset-semantiek topic",
+    description=(
+        "Interpretatieregels voor één dataset-semantiek topic -- zie "
+        "rce-cho://semantics/topics voor de beschikbare topic-namen."
+    ),
+    mime_type="text/plain",
+)
+def semantics_topic_resource(topic: str) -> str:
+    return format_topic(topic)
+
+
+# ---------------------------------------------------------------------------
+# Prompts: herbruikbare, direct aanroepbare templates voor de meest
+# voorkomende vraagpatronen. Bouwen bewust op de bestaande tools/semantiek
+# (geen eigen logica) -- een prompt is hier puur een voorgesorteerde,
+# benoemde workflow-starter.
+# ---------------------------------------------------------------------------
+
+
+@mcp.prompt(
+    name="zoek_monumenten_in_gemeente",
+    description="Zoek rijksmonumenten (of een andere CEO-class) in een gemeente.",
+)
+def zoek_monumenten_in_gemeente_prompt(
+    gemeente: str,
+    class_name: str = "Rijksmonument",
+) -> str:
+    return (
+        f"Gebruik monumenten_in_gemeente(gemeente={gemeente!r}, "
+        f"class_name={class_name!r}) om te zoeken, en vat het resultaat "
+        "samen in begrijpelijk Nederlands. Raadpleeg bij twijfel over "
+        "juridische_status of monument_aard eerst semantics_describe_topic()."
+    )
+
+
+@mcp.prompt(
+    name="zoek_scheepswrak",
+    description="Zoek een scheepswrak op naam in de RCE MASS-dataset (maritiem erfgoed).",
+)
+def zoek_scheepswrak_prompt(naam: str) -> str:
+    return (
+        f"Gebruik query_sparql_mass() om een vaartuig met naam {naam!r} te "
+        "vinden (zie semantics_describe_topic('maritime') voor de "
+        "querypaden: sdo:Vehicle/sdo:name, sdo:location/sdo:geo voor "
+        "coördinaten, schema:additionalType voor het scheepstype). "
+        "Vat het resultaat samen in begrijpelijk Nederlands, inclusief "
+        "locatie en scheepstype als die bekend zijn."
+    )
 
 
 def main() -> None:

@@ -192,6 +192,48 @@ Ontwerpprincipe:
 
 De resolver kiest nooit zelf tussen meerdere resultaten.
 
+### 5a. Gemeente & monumentenlijsten
+
+Combineert gemeente-resolutie, de juiste graph en een standaard
+juridische-statusfilter in één aanroep, in plaats van drie losse,
+foutgevoelige stappen.
+
+Huidige tools:
+
+- `resolve_gemeente`
+- `monumenten_in_gemeente`
+
+`resolve_gemeente` filtert, anders dan een kale `resolve_concept_label`, altijd
+op `rdf:type owms:Gemeente` zodat een gelijknamige provincie of kadastrale
+gemeente (bv. "Utrecht") niet als kandidaat meekomt.
+
+### 5c. Oppervlakte & kadaster
+
+Berekent server-side wat anders ruwe WKT-geometrie en een eigen
+spatial-join-implementatie van de client zou vergen.
+
+Huidige tools:
+
+- `grootste_monumenten_oppervlakte` — oppervlakte uit polygoongeometrie via
+  `geof:area()`, zonder ruwe WKT naar de client te sturen
+- `percelen_via_spatial_join` — welke Kadaster-percelen een rijksmonument
+  daadwerkelijk overlapt, via een echte ruimtelijke join met het Kadaster
+  KKG-endpoint (`geof:sfIntersects`), onafhankelijk van RCE's eigen
+  BRK-koppeling (niet gegarandeerd compleet)
+
+### 5d. Maritiem erfgoed (RCE MASS)
+
+Apart dataset/endpoint voor maritiem erfgoed (scheepswrakken wereldwijd), met
+een eigen schema.org-achtige vocabulaire (`sdo:Vehicle`/`Place`/
+`GeoCoordinates`) -- geen CEO-object, geen CHO-endpoint.
+
+Huidige tools:
+
+- `query_sparql_mass`
+
+Raadpleeg `semantics_describe_topic('maritime')` voor de querypaden voordat
+je zelf een pad verzint, net als bij het CHO-endpoint.
+
 ### 5b. Conceptzoeken (NDE Termennetwerk)
 
 Zoekt SKOS-concepten op natuurlijke taal, met synoniemen en verwante termen,
@@ -239,11 +281,12 @@ Voorbeelden van controles:
 - `COUNT` zonder alias
 - query zonder `FROM` of `GRAPH` als waarschuwing, niet als fout
 - gebruik van `skos:prefLabel`-gebonden variabelen in FILTER zonder `STR()` (stille nul-resultaten)
-- GeoSPARQL-relaties die structureel timeout veroorzaken op Virtuoso (`geof:sfWithin` e.d.)
-- `GROUP BY` op lange tekstvelden (`ceo:omschrijving`, `ceo:naam`) die Virtuoso-overflowfouten geven
+- GeoSPARQL-relaties die structureel timeout veroorzaken op dit endpoint (`geof:sfWithin` e.d.)
+- `GROUP BY` op lange tekstvelden (`ceo:omschrijving`, `ceo:naam`) die een overflowfout geven
 - `ORDER BY` gecombineerd met `OPTIONAL`-joins (veroorzaakt consistent een HTTP 504, ook met kleine `LIMIT`)
 - meerdere onafhankelijke multi-valued `OPTIONAL`-blokken in dezelfde query (cartesisch product)
 - `ceo:huisnummer` / `ceo:perceelnummer` met een kaal getal-literal i.p.v. een gequote string (stille nul-resultaten)
+- een rijksmonument-/complex-/gezicht-/werelderfgoednummer dat via `CONCAT()` direct in een CHO-URI-pad wordt geplakt (dat padsegment is het interne `cultuurhistorischObjectnummer`, niet dat nummer -- de fout geeft geen foutmelding, alleen het verkeerde monument)
 
 ### 7. Execution
 
@@ -254,6 +297,7 @@ Huidige tools:
 - `query_sparql`
 - `query_sparql_json`
 - `query_sparql_geojson`
+- `query_sparql_mass` (apart MASS-endpoint, zie capabilitygroep 5d)
 - `convert_rd_to_wgs84`
 
 `query_sparql` geeft leesbare tekst terug.
@@ -290,13 +334,18 @@ POST is getest tot ~255KB / ~3000 URI's zonder problemen.
 ### Endpoints: default en fallback
 
 Queries gaan standaard naar het "Speedy"-endpoint (standaardconforme
-SPARQL 1.1). Is dat endpoint onbereikbaar of geeft het een gateway-fout
+SPARQL 1.1, en het endpoint dat GeoSPARQL-functies zoals `geof:area()`
+daadwerkelijk ondersteunt -- live getest 2026-10-30: `geof:area()` geeft op
+Speedy HTTP 200 met correct resultaat, op "Virtuoso" HTTP 400 "Unknown
+function"). Is Speedy onbereikbaar of geeft het een gateway-fout
 (502/503/504), dan probeert `execute_sparql()` automatisch één keer opnieuw
-via het "Virtuoso"-endpoint — dat wel GeoSPARQL ondersteunt, maar de hierboven
-genoemde eigenaardigheden heeft (GROUP BY-overflow, ORDER BY+OPTIONAL 504's,
-geof:sfWithin-timeouts). Een queryfout (bv. een syntaxfout, 4xx) triggert geen
-fallback, omdat dezelfde query daar identiek zou falen. Overschrijfbaar via de
-omgevingsvariabelen `SPARQL_ENDPOINT` en `SPARQL_FALLBACK_ENDPOINT`.
+via het "Virtuoso"-endpoint. Welk van de twee endpoints precies de hierboven
+genoemde eigenaardigheden geeft (GROUP BY-overflow, ORDER BY+OPTIONAL 504's,
+geof:sfWithin-timeouts) is niet opnieuw per-endpoint geverifieerd; de
+validator waarschuwt er hoe dan ook voor. Een queryfout (bv. een syntaxfout,
+4xx) triggert geen fallback, omdat dezelfde query daar identiek zou falen.
+Overschrijfbaar via de omgevingsvariabelen `SPARQL_ENDPOINT` en
+`SPARQL_FALLBACK_ENDPOINT`.
 
 ### 8. Statistics
 
@@ -350,6 +399,31 @@ of de workflow-instructies staat, of om te verifiëren of een in de ontologie
 gedeclareerd pad ook daadwerkelijk gevuld is. De getoonde aantallen gelden
 alleen binnen de steekproef, niet voor de hele dataset. Snel (steekproef,
 geen full-dataset scan): enkele seconden.
+
+### 10. Resources & Prompts
+
+Naast tools (die de client/LLM actief aanroept) biedt de server ook twee
+andere MCP-primitieven voor statische referentiedata en voorgesorteerde
+workflows.
+
+Huidige resources:
+
+- `rce-cho://graphs`
+- `rce-cho://ontology/statistics`
+- `rce-cho://semantics/topics`
+- `rce-cho://semantics/{topic}` (template)
+
+Huidige prompts:
+
+- `zoek_monumenten_in_gemeente`
+- `zoek_scheepswrak`
+
+Resources geven hetzelfde materiaal als de gelijknamige tools
+(`graphs_list`, `ontology_statistics`, `semantics_list_topics`/
+`semantics_describe_topic`), maar dan browse-/aanhechtbaar zonder een
+tool-call. Prompts zijn geen eigen logica, alleen een benoemde,
+voorgesorteerde workflow-starter die naar de bestaande tools/semantiek
+verwijst.
 
 ## Bekende performance- en datakwaliteitskenmerken
 
