@@ -1,12 +1,22 @@
 import functools
+import inspect
 import json
+import logging
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from rce_cho_mcp.config import SPARQL_ENDPOINT, SPARQL_FALLBACK_ENDPOINT, USER_AGENT
 from rce_cho_mcp.pitfalls import TWO_STAGE_SUBQUERY_REMEDY
+
+# Root-logging wordt al naar stderr geconfigureerd door FastMCP zelf
+# (configure_logging(), aangeroepen vanuit FastMCP.__init__() in server.py's
+# `mcp = FastMCP(...)`-regel) -- nooit naar stdout loggen, dat zou bij de
+# stdio-transport het JSON-RPC-berichtenverkeer corrumperen. Deze module
+# gebruikt alleen een gewone getLogger(); geen eigen handler/config nodig.
+logger = logging.getLogger(__name__)
 
 # Gateway-level codes that mean "this endpoint instance is having trouble",
 # as opposed to a 4xx that reflects a problem with the query itself.
@@ -53,9 +63,22 @@ def post_sparql(endpoint: str, query: str, timeout: int = 30) -> dict:
         method="POST",
     )
 
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        raw = response.read().decode("utf-8")
-        return json.loads(raw)
+    logger.debug("POST %s (%d bytes query)", endpoint, len(data))
+    start = time.monotonic()
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read().decode("utf-8")
+            elapsed = time.monotonic() - start
+            logger.debug("POST %s klaar in %.2fs (HTTP %s)", endpoint, elapsed, response.status)
+            return json.loads(raw)
+    except urllib.error.HTTPError as e:
+        elapsed = time.monotonic() - start
+        logger.warning("POST %s gaf HTTP %s na %.2fs", endpoint, e.code, elapsed)
+        raise
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+        elapsed = time.monotonic() - start
+        logger.warning("POST %s onbereikbaar na %.2fs: %s", endpoint, elapsed, e)
+        raise
 
 
 def execute_sparql(query: str, timeout: int = 30) -> dict:
@@ -83,10 +106,15 @@ def execute_sparql(query: str, timeout: int = 30) -> dict:
             return post_sparql(endpoint, query, timeout)
         except urllib.error.HTTPError as e:
             if not is_last_attempt and e.code in _FALLBACK_HTTP_CODES:
+                logger.warning(
+                    "%s gaf HTTP %s (gateway-fout) -- val terug op %s",
+                    endpoint, e.code, endpoints[index + 1],
+                )
                 continue
             raise
         except (urllib.error.URLError, TimeoutError, ConnectionError):
             if not is_last_attempt:
+                logger.warning("%s onbereikbaar -- val terug op %s", endpoint, endpoints[index + 1])
                 continue
             raise
 
@@ -124,30 +152,60 @@ def classify_error(body: str, http_code: int) -> tuple[str, str]:
     return ("HTTP_ERROR", f"HTTP {http_code}: onbekende fout van het endpoint.")
 
 
+def _log_tool_exception(func_name: str, exc: Exception) -> None:
+    """Centrale foutlogging voor elke tool die via een van de decorators
+    hieronder loopt -- één plek, dus logging voor alle ~20 betrokken tools
+    tegelijk in plaats van losse logregels per tool."""
+    if isinstance(exc, urllib.error.HTTPError):
+        logger.error("%s: HTTP %s van %s", func_name, exc.code, exc.url)
+    else:
+        logger.error("%s: onverwachte fout %s: %s", func_name, type(exc).__name__, exc)
+
+
 def sparql_text_errors(include_body: bool = False):
     """Decorator for an @mcp.tool() that returns str.
 
     Catches urllib.error.HTTPError and any other exception and formats them
     the same way every such tool does (classify_error() + a consistent Dutch
     foutmelding), instead of each tool in server.py repeating the same
-    try/except block.
+    try/except block. Werkt op zowel een gewone als een async tool-functie
+    (nodig voor tools die ctx.report_progress() awaiten).
 
     include_body: when True, append the raw error body (truncated) to the
     message -- used by query_sparql(), which shows it for debugging.
     """
     def decorator(func):
+        def _format_http_error(e: urllib.error.HTTPError) -> str:
+            body = e.read().decode("utf-8", errors="replace")
+            code, advies = classify_error(body, e.code)
+            text = f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
+            if include_body:
+                text += f"\n\nRuwe foutmelding:\n{body[:500]}"
+            return text
+
+        if inspect.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                try:
+                    return await func(*args, **kwargs)
+                except urllib.error.HTTPError as e:
+                    _log_tool_exception(func.__name__, e)
+                    return _format_http_error(e)
+                except Exception as e:
+                    _log_tool_exception(func.__name__, e)
+                    return f"Onverwachte fout: {type(e).__name__}: {e}"
+
+            return async_wrapper
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
             except urllib.error.HTTPError as e:
-                body = e.read().decode("utf-8", errors="replace")
-                code, advies = classify_error(body, e.code)
-                text = f"[{code}] HTTP {e.code} van {e.url}\n\nAdvies: {advies}"
-                if include_body:
-                    text += f"\n\nRuwe foutmelding:\n{body[:500]}"
-                return text
+                _log_tool_exception(func.__name__, e)
+                return _format_http_error(e)
             except Exception as e:
+                _log_tool_exception(func.__name__, e)
                 return f"Onverwachte fout: {type(e).__name__}: {e}"
 
         return wrapper
@@ -158,26 +216,41 @@ def sparql_text_errors(include_body: bool = False):
 def sparql_dict_errors(func):
     """Same as sparql_text_errors(), for an @mcp.tool() that returns a dict."""
 
+    def _error_dict(e: urllib.error.HTTPError) -> dict:
+        body = e.read().decode("utf-8", errors="replace")
+        code, advies = classify_error(body, e.code)
+        return {
+            "error": code,
+            "status": e.code,
+            "advies": advies,
+            "endpoint": e.url,
+            "body": body[:500],
+        }
+
+    if inspect.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except urllib.error.HTTPError as e:
+                _log_tool_exception(func.__name__, e)
+                return _error_dict(e)
+            except Exception as e:
+                _log_tool_exception(func.__name__, e)
+                return {"error": "unexpected_error", "type": type(e).__name__, "message": str(e)}
+
+        return async_wrapper
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", errors="replace")
-            code, advies = classify_error(body, e.code)
-            return {
-                "error": code,
-                "status": e.code,
-                "advies": advies,
-                "endpoint": e.url,
-                "body": body[:500],
-            }
+            _log_tool_exception(func.__name__, e)
+            return _error_dict(e)
         except Exception as e:
-            return {
-                "error": "unexpected_error",
-                "type": type(e).__name__,
-                "message": str(e),
-            }
+            _log_tool_exception(func.__name__, e)
+            return {"error": "unexpected_error", "type": type(e).__name__, "message": str(e)}
 
     return wrapper
 
@@ -194,13 +267,13 @@ def format_results(data: dict, max_rows: int = 100) -> str:
         return "Geen resultaten gevonden."
 
     total = len(bindings)
-    rows = bindings[:max_rows]
+    shown_rows = bindings[:max_rows]
 
     lines = [f"Gevonden: {total} resultaat/resultaten (max {max_rows} getoond)\n"]
     lines.append(" | ".join(variables))
     lines.append("-" * 60)
 
-    for row in rows:
+    for row in shown_rows:
         values = []
         for variable in variables:
             cell = row.get(variable, {})

@@ -7,6 +7,8 @@ er daadwerkelijk in de live data staat, inclusief klassen/properties die wel
 gedefinieerd maar (nog) niet gebruikt zijn.
 """
 
+from collections.abc import Awaitable, Callable
+
 from rce_cho_mcp.sparql import execute_sparql
 from rce_cho_mcp.sparql import rows as _rows
 
@@ -16,24 +18,39 @@ _MIN_SAMPLE_SIZE = 100
 _MAX_SAMPLE_SIZE = 10_000
 _LONG_QUERY_TIMEOUT = 120
 
+OnStep = Callable[[float, float, str], Awaitable[None]]
+
 
 def _clamp_sample_size(sample_size: int) -> int:
     return max(_MIN_SAMPLE_SIZE, min(sample_size, _MAX_SAMPLE_SIZE))
 
 
-def dataset_totals() -> dict[str, int | str]:
+async def dataset_totals(on_step: OnStep | None = None) -> dict[str, int | str]:
     """Kerncijfers van de live dataset: aantal triples, entiteiten, klassen
-    en properties."""
+    en properties.
+
+    on_step: optionele async callback (progress, total, message), aangeroepen
+    vóór elk van de vier deelqueries -- bedoeld om FastMCP's
+    ctx.report_progress() direct door te geven, zodat een client kan tonen
+    dat deze tot een paar minuten durende tool nog bezig is (zie
+    dataset_statistics() in server.py). Zonder on_step gedraagt deze functie
+    zich identiek aan voorheen, alleen nu als coroutine.
+    """
     queries = {
         "triples": "SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }",
         "entiteiten": "SELECT (COUNT(DISTINCT ?s) AS ?n) WHERE { ?s a [] }",
         "klassen": "SELECT (COUNT(DISTINCT ?c) AS ?n) WHERE { [] a ?c }",
         "properties": "SELECT (COUNT(DISTINCT ?p) AS ?n) WHERE { [] ?p [] }",
     }
+    total_steps = len(queries)
     totals: dict[str, int | str] = {}
-    for name, query in queries.items():
+    for i, (name, query) in enumerate(queries.items()):
+        if on_step is not None:
+            await on_step(i, total_steps, f"Tellen van {name}...")
         rows = _rows(execute_sparql(query, timeout=_LONG_QUERY_TIMEOUT))
         totals[name] = int(rows[0]["n"]["value"]) if rows else 0
+    if on_step is not None:
+        await on_step(total_steps, total_steps, "Klaar.")
     return totals
 
 

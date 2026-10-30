@@ -37,9 +37,11 @@ Niet geaffilieerd met de Rijksdienst voor het Cultureel Erfgoed.
 - Valideren van SPARQL-queries voorafgaand aan uitvoering.
 - Uitvoeren van SPARQL SELECT- en ASK-queries.
 - Leveren van datasetsemantiek voor belangrijke modelleerpatronen.
-- Detecteren van bekende Virtuoso-specifieke query-valkuilen voorafgaand aan uitvoering.
-- Rapporteren van live datasetstatistieken (triples, entiteiten, aantallen per class en per property).
+- Detecteren van bekende endpoint-specifieke query-valkuilen voorafgaand aan uitvoering.
+- Rapporteren van live datasetstatistieken (triples, entiteiten, aantallen per class en per property), met voortgangsrapportage voor de volledige-datasetscan.
 - Verkennen van daadwerkelijke querypaden van/naar een class via steekproeven, onafhankelijk van wat de ontologie declareert.
+- Automatische gemeente-resolutie en monumentenlijsten per gemeente, inclusief kadastrale oppervlakteberekening en een echte spatial join met het Kadaster.
+- Bevragen van de aparte RCE MASS-dataset voor maritiem erfgoed (scheepswrakken wereldwijd).
 
 ### Linked Data-filosofie
 
@@ -99,6 +101,14 @@ In tegenstelling tot de ontologietools hierboven (die beschrijven wat er *gedefi
 
 **Resolver:** `resolve_concept_label`, `describe_resource_uri`
 
+**Gemeente & monumentenlijsten:** `resolve_gemeente`, `monumenten_in_gemeente`
+
+`resolve_gemeente` disambigueert een gemeentenaam tegen gelijknamige provincies/kadastrale gemeenten. `monumenten_in_gemeente` combineert gemeente-resolutie, de juiste graph en een standaard juridische-statusfilter in één aanroep.
+
+**Oppervlakte & kadaster:** `grootste_monumenten_oppervlakte`, `percelen_via_spatial_join`
+
+`grootste_monumenten_oppervlakte` berekent server-side oppervlaktes uit polygoongeometrie (geen ruwe WKT naar de client). `percelen_via_spatial_join` berekent via een echte ruimtelijke join met het Kadaster KKG-endpoint welke percelen een rijksmonument daadwerkelijk overlapt, onafhankelijk van RCE's eigen (niet gegarandeerd complete) BRK-koppeling.
+
 **Conceptzoeken (NDE Termennetwerk):** `zoek_concept_termennetwerk`, `lookup_termennetwerk_uri`
 
 `zoek_concept_termennetwerk` doet een relevantie-gerangschikte, synoniemgevoelige zoekopdracht over gepubliceerde terminologiebronnen (standaard CHT, ABR; Wikidata en AAT beschikbaar) via de publieke, niet-geauthenticeerde GraphQL API van het Termennetwerk, in tegenstelling tot `resolve_concept_label`, dat alleen een exacte `skos:prefLabel`-match doet binnen onze eigen named graphs. `lookup_termennetwerk_uri` herleidt externe concept-URI's (bijvoorbeeld een `skos:exactMatch`-doel gevonden via `describe_resource_uri`) terug naar labels.
@@ -112,16 +122,19 @@ Validatiechecks omvatten onder meer:
 - ontbrekende `DISTINCT` of `COUNT`-alias
 - volgorde van `SELECT/FROM/WHERE`
 - verdachte of niet-bestaande prefixen (`ceosp:`, `ceox:`) en handmatige taalfilters (`LANG()`/`LANGMATCHES()`)
-- GeoSPARQL-relaties die structurele timeouts veroorzaken op Virtuoso (`geof:sfWithin` e.d.)
-- `GROUP BY` op lange tekstvelden die Virtuoso-overflowfouten veroorzaken
+- GeoSPARQL-relaties die structurele timeouts veroorzaken op dit endpoint (`geof:sfWithin` e.d.)
+- `GROUP BY` op lange tekstvelden die een overflowfout veroorzaken
 - `ORDER BY` gecombineerd met `OPTIONAL`-joins, wat consistent een HTTP 504 veroorzaakt op dit endpoint
 - meerdere onafhankelijke `OPTIONAL`-blokken in één query, wat een cartesisch product oplevert in plaats van losse feiten
+- een rijksmonument-/complex-/gezicht-/werelderfgoednummer dat via `CONCAT()` direct in een CHO-URI-pad wordt geplakt (dat padsegment is het interne `cultuurhistorischObjectnummer`, niet dat nummer)
 
-**Uitvoering:** `query_sparql`, `query_sparql_json`, `query_sparql_geojson`, `convert_rd_to_wgs84`
+**Uitvoering:** `query_sparql`, `query_sparql_json`, `query_sparql_geojson`, `query_sparql_mass`, `convert_rd_to_wgs84`
 
-`query_sparql` geeft leesbare tekst terug met geclassificeerde foutcodes bij falen. `query_sparql_json` geeft ruwe SPARQL JSON terug voor agents, tabellen, benchmarks en vervolgverwerking. `query_sparql_geojson` converteert SELECT-resultaten met een WKT-geometrievariabele naar een GeoJSON FeatureCollection. `convert_rd_to_wgs84` converteert een enkel RD New-coördinatenpaar (EPSG:28992) naar WGS84.
+`query_sparql` geeft leesbare tekst terug met geclassificeerde foutcodes bij falen. `query_sparql_json` geeft ruwe SPARQL JSON terug voor agents, tabellen, benchmarks en vervolgverwerking. `query_sparql_geojson` converteert SELECT-resultaten met een WKT-geometrievariabele naar een GeoJSON FeatureCollection. `query_sparql_mass` bevraagt de aparte RCE MASS-dataset (maritiem erfgoed, eigen schema.org-achtige vocabulaire) in plaats van het CHO-endpoint — zie `semantics_describe_topic('maritime')`. `convert_rd_to_wgs84` converteert een enkel RD New-coördinatenpaar (EPSG:28992) naar WGS84.
 
-**Endpoints.** Standaard gaan queries naar het "Speedy"-endpoint (standaardconform SPARQL 1.1). Als dat endpoint onbereikbaar is of een gateway-foutmelding geeft (502/503/504), probeert `execute_sparql()` automatisch één keer opnieuw tegen het "Virtuoso"-endpoint, dat GeoSPARQL ondersteunt maar de hierboven genoemde query-eigenaardigheden heeft. Override met de omgevingsvariabelen `SPARQL_ENDPOINT` en `SPARQL_FALLBACK_ENDPOINT`.
+**Endpoints.** Standaard gaan queries naar het "Speedy"-endpoint (standaardconform SPARQL 1.1, en het endpoint dat GeoSPARQL-functies zoals `geof:area()` daadwerkelijk ondersteunt). Als dat endpoint onbereikbaar is of een gateway-foutmelding geeft (502/503/504), probeert `execute_sparql()` automatisch één keer opnieuw tegen het "Virtuoso"-endpoint. Welk van de twee endpoints de hierboven genoemde query-eigenaardigheden (GROUP BY-overflow, ORDER BY+OPTIONAL-504, geof:sfWithin-timeout) exact geeft, is niet per-endpoint herverifieerd; de validator waarschuwt er hoe dan ook voor. Override met de omgevingsvariabelen `SPARQL_ENDPOINT` en `SPARQL_FALLBACK_ENDPOINT`.
+
+**Resources en Prompts.** Naast tools biedt de server ook MCP Resources (`rce-cho://graphs`, `rce-cho://ontology/statistics`, `rce-cho://semantics/topics`, en de template `rce-cho://semantics/{topic}`) voor clients die statische referentiedata willen browsen/aanhechten zonder een tool aan te roepen, en twee MCP Prompts (`zoek_monumenten_in_gemeente`, `zoek_scheepswrak`) als voorgesorteerde workflow-starters.
 
 ### Waarom datasetsemantiek?
 
@@ -142,6 +155,15 @@ Zonder deze kennis genereren LLM's vaak plausibele maar onjuiste SPARQL.
 - Herleid het label `Utrecht` in de OWMS-graph.
 - Welke monumentfuncties komen voor in Maastricht?
 - Welke archeologische terreinen komen voor in Limburg?
+
+### Tests
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+De testsuite draait volledig offline (gemockte/gefixeerde data, geen live SPARQL-calls) en dekt querybouw, validatie, parsing en de MCP-tool-/resource-/prompt-registratie.
 
 ### Configuratie Claude Desktop
 
@@ -205,9 +227,11 @@ Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
 - Validate SPARQL queries before execution.
 - Execute SPARQL SELECT and ASK queries.
 - Provide dataset semantics for important modelling patterns.
-- Detect known Virtuoso-specific query pitfalls before execution.
-- Report live dataset statistics (triples, entities, per-class and per-property counts).
+- Detect known endpoint-specific query pitfalls before execution.
+- Report live dataset statistics (triples, entities, per-class and per-property counts), with progress reporting for the full-dataset scan.
 - Explore actual query paths from/to a class via sampling, independent of what the ontology declares.
+- Automatic municipality resolution and per-municipality monument lists, including cadastral area calculation and a real spatial join with the Cadastre.
+- Query the separate RCE MASS dataset for maritime heritage (shipwrecks worldwide).
 
 ### Linked Data philosophy
 
@@ -267,6 +291,14 @@ Unlike the ontology tools above (which describe what is *defined* in the bundled
 
 **Resolver:** `resolve_concept_label`, `describe_resource_uri`
 
+**Municipality & monument lists:** `resolve_gemeente`, `monumenten_in_gemeente`
+
+`resolve_gemeente` disambiguates a municipality name against same-named provinces/cadastral municipalities. `monumenten_in_gemeente` combines municipality resolution, the right graph and a default legal-status filter in a single call.
+
+**Area & cadastre:** `grootste_monumenten_oppervlakte`, `percelen_via_spatial_join`
+
+`grootste_monumenten_oppervlakte` computes areas server-side from polygon geometry (no raw WKT sent to the client). `percelen_via_spatial_join` uses a real spatial join against the Cadastre's KKG endpoint to find which parcels actually overlap a rijksmonument, independent of RCE's own (not guaranteed complete) BRK link.
+
 **Concept search (NDE Network of Terms):** `zoek_concept_termennetwerk`, `lookup_termennetwerk_uri`
 
 `zoek_concept_termennetwerk` does a relevance-ranked, synonym-aware search across published terminology sources (CHT, ABR by default; Wikidata and AAT available) via the public, unauthenticated Network of Terms GraphQL API, unlike `resolve_concept_label`, which only does an exact `skos:prefLabel` match within our own named graphs. `lookup_termennetwerk_uri` resolves external concept URIs (e.g. a `skos:exactMatch` target found via `describe_resource_uri`) back to labels.
@@ -280,16 +312,19 @@ Validation checks include:
 - missing `DISTINCT` or `COUNT` alias
 - `SELECT/FROM/WHERE` ordering
 - suspicious/non-existent prefixes (`ceosp:`, `ceox:`) and manual language filters (`LANG()`/`LANGMATCHES()`)
-- GeoSPARQL relations that cause structural timeouts on Virtuoso (`geof:sfWithin` etc.)
-- `GROUP BY` on long text fields that trigger Virtuoso overflow errors
+- GeoSPARQL relations that cause structural timeouts on this endpoint (`geof:sfWithin` etc.)
+- `GROUP BY` on long text fields that trigger an overflow error
 - `ORDER BY` combined with `OPTIONAL` joins, which causes a consistent HTTP 504 on this endpoint
 - multiple independent `OPTIONAL` blocks in one query, which produces a cartesian product instead of separate facts
+- a rijksmonument/complex/gezicht/werelderfgoed number pasted directly into a CHO URI path via `CONCAT()` (that path segment is the internal `cultuurhistorischObjectnummer`, not that number)
 
-**Execution:** `query_sparql`, `query_sparql_json`, `query_sparql_geojson`, `convert_rd_to_wgs84`
+**Execution:** `query_sparql`, `query_sparql_json`, `query_sparql_geojson`, `query_sparql_mass`, `convert_rd_to_wgs84`
 
-`query_sparql` returns readable text with classified error codes on failure. `query_sparql_json` returns raw SPARQL JSON for agents, tables, benchmarks and follow-up processing. `query_sparql_geojson` converts SELECT results with a WKT geometry variable into a GeoJSON FeatureCollection. `convert_rd_to_wgs84` converts a single RD New (EPSG:28992) coordinate pair to WGS84.
+`query_sparql` returns readable text with classified error codes on failure. `query_sparql_json` returns raw SPARQL JSON for agents, tables, benchmarks and follow-up processing. `query_sparql_geojson` converts SELECT results with a WKT geometry variable into a GeoJSON FeatureCollection. `query_sparql_mass` queries the separate RCE MASS dataset (maritime heritage, its own schema.org-like vocabulary) instead of the CHO endpoint -- see `semantics_describe_topic('maritime')`. `convert_rd_to_wgs84` converts a single RD New (EPSG:28992) coordinate pair to WGS84.
 
-**Endpoints.** By default, queries go to the "Speedy" endpoint (standards-compliant SPARQL 1.1). If that endpoint is unreachable or returns a gateway-level error (502/503/504), `execute_sparql()` automatically retries once against the "Virtuoso" endpoint, which supports GeoSPARQL but has the query quirks listed above. Override with the `SPARQL_ENDPOINT` and `SPARQL_FALLBACK_ENDPOINT` environment variables.
+**Endpoints.** By default, queries go to the "Speedy" endpoint (standards-compliant SPARQL 1.1, and the endpoint that actually supports GeoSPARQL functions such as `geof:area()`). If that endpoint is unreachable or returns a gateway-level error (502/503/504), `execute_sparql()` automatically retries once against the "Virtuoso" endpoint. Which of the two endpoints exactly produces the query quirks listed above (GROUP BY overflow, ORDER BY+OPTIONAL 504, geof:sfWithin timeout) has not been re-verified per endpoint; the validator warns regardless. Override with the `SPARQL_ENDPOINT` and `SPARQL_FALLBACK_ENDPOINT` environment variables.
+
+**Resources and Prompts.** Besides tools, the server also exposes MCP Resources (`rce-cho://graphs`, `rce-cho://ontology/statistics`, `rce-cho://semantics/topics`, and the template `rce-cho://semantics/{topic}`) for clients that want to browse/attach static reference data without calling a tool, and two MCP Prompts (`zoek_monumenten_in_gemeente`, `zoek_scheepswrak`) as pre-built workflow starters.
 
 ### Why dataset semantics?
 
@@ -310,6 +345,15 @@ Without this knowledge, LLMs often generate plausible but incorrect SPARQL.
 - Resolve the label `Utrecht` in the OWMS graph.
 - Which monument functions occur in Maastricht?
 - Which archaeological sites occur in Limburg?
+
+### Tests
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+The test suite runs entirely offline (mocked/fixture data, no live SPARQL calls) and covers query building, validation, parsing, and MCP tool/resource/prompt registration.
 
 ### Claude Desktop configuration
 

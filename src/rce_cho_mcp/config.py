@@ -73,6 +73,17 @@ KKG_SPARQL_ENDPOINT = os.getenv(
     "https://api.labs.kadaster.nl/datasets/kadaster/kkg/services/kkg/sparql",
 )
 
+# RCE MASS: "Maritiem Archeologische Scheepswrakken database" -- aparte
+# dataset/endpoint voor maritiem erfgoed (scheepswrakken wereldwijd), met
+# een eigen schema.org-achtige vocabulaire (sdo:Vehicle/Place/GeoCoordinates),
+# los van de CEO-ontologie en los van het CHO-endpoint hierboven. Zie
+# semantics_describe_topic('maritime'). Live getest (2026-10-30): de data
+# zit in het default-graph van dit endpoint, geen GRAPH-restrictie nodig.
+MASS_SPARQL_ENDPOINT = os.getenv(
+    "MASS_SPARQL_ENDPOINT",
+    "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/mass/sparql",
+)
+
 # Public, unauthenticated GraphQL API of the NDE Network of Terms
 # (https://termennetwerk.netwerkdigitaalerfgoed.nl/), used for fuzzy
 # concept search with synonyms across published thesauri (CHT, ABR, ...).

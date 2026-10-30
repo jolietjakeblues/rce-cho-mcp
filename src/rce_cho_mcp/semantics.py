@@ -686,6 +686,84 @@ SEMANTIC_TOPICS = {
             },
         ],
     },
+    "maritime": {
+        "title": "Maritiem erfgoed (MASS-dataset, los endpoint)",
+        "description": (
+            "Gebruik dit topic voor vragen over scheepswrakken, maritiem "
+            "erfgoed, VOC-schepen of andere historische vaartuigen. Dit zijn "
+            "GEEN CEO-objecten -- de data staat in een apart dataset/endpoint "
+            "(RCE MASS), met een eigen schema.org-achtige vocabulaire "
+            "(sdo:Vehicle/Place/GeoCoordinates), niet in ceo:Rijksmonument of "
+            "een andere CEO-class. Gebruik hiervoor query_sparql_mass(), niet "
+            "query_sparql() -- die laatste bevraagt het CHO-endpoint, waar "
+            "deze data niet in staat."
+        ),
+        "patterns": [
+            {
+                "name": "Scheepsrecord (naam, type, omschrijving)",
+                "path": [
+                    "a sdo:Vehicle",
+                    "sdo:name",
+                    "schema:additionalType",
+                    "sdo:description",
+                ],
+                "guidance": (
+                    "Kernpatroon: ?vehicle a <https://sdo.org/Vehicle> ; "
+                    "<https://sdo.org/name> ?naam . Elk vaartuig heeft meestal "
+                    "TWEE sdo:name-waarden: een met een jaartal-suffix (bv. "
+                    "\"Hendrika (+1850)\", het zinkjaar) en een zonder (\"Hendrika\") "
+                    "-- dedupliceer of kies bewust één variant, anders toont een "
+                    "lijst elk schip dubbel. Het scheepstype (bv. \"Fregat\", "
+                    "\"Vrachtschip\", \"Jacht\") staat niet op sdo: maar op "
+                    "<https://schema.org/additionalType> (een ander, "
+                    "ongeprefixt namespace dan de rest van deze dataset -- "
+                    "let op het verschil tussen sdo.org en schema.org). "
+                    "sdo:description is lange HTML-tekst (vergelijkbaar met "
+                    "ceo:omschrijving op het CHO-endpoint qua grootte); gebruik "
+                    "dit niet als selectiecriterium zonder LIMIT. Anders dan "
+                    "skos:prefLabel op het CHO-endpoint zijn deze literals NIET "
+                    "taalgetagd -- een kale FILTER(?naam = \"Hendrika\") of "
+                    "CONTAINS(LCASE(?naam), ...) werkt hier gewoon, zonder "
+                    "STR()-wrap of resolve_concept_label()."
+                ),
+            },
+            {
+                "name": "Locatie en coordinaten",
+                "path": [
+                    "sdo:location",
+                    "sdo:geo",
+                    "sdo:latitude",
+                    "sdo:longitude",
+                ],
+                "guidance": (
+                    "Vervolgpad vanaf het vaartuig: ?vehicle sdo:location ?plaats . "
+                    "?plaats sdo:geo ?geo . ?geo sdo:latitude ?lat ; sdo:longitude ?lon . "
+                    "Beide zijn xsd:double in decimale graden, WGS84 -- GEEN WKT "
+                    "zoals geo:asWKT op het CHO-endpoint, dus niet door "
+                    "query_sparql_geojson() (die verwacht een enkele WKT-variabele) "
+                    "of wkt_to_geometry() te halen; bouw zelf een "
+                    "{\"type\": \"Point\", \"coordinates\": [lon, lat]} als GeoJSON "
+                    "nodig is. ?plaats heeft ook sdo:containedInPlace (landnaam als "
+                    "platte string, bv. \"Nederland\", \"Verenigd Koninkrijk\" -- "
+                    "geen OWMS-concept-URI, dus resolve_concept_label() of "
+                    "resolve_gemeente() zijn hier niet van toepassing) en "
+                    "sem:hasBeginTimeStamp/sem:hasEndTimeStamp (een jaartal-bereik "
+                    "voor de periode van het wrak/object op die locatie, bv. 1800-1850)."
+                ),
+            },
+            {
+                "name": "Ontdekkingsjaar",
+                "path": ["schema:discovered"],
+                "guidance": (
+                    "<https://schema.org/discovered> (let op: schema.org-namespace, "
+                    "niet sdo.org) geeft het jaar waarin het wrak ontdekt is, als "
+                    "kaal geheel getal-literal (bv. 2004). Niet op elk vaartuig "
+                    "aanwezig (580 van de 2587 in een steekproef) -- gebruik "
+                    "OPTIONAL."
+                ),
+            },
+        ],
+    },
     "archaeology": {
         "title": "Archeologische objecten",
         "description": (
