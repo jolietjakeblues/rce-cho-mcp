@@ -41,6 +41,7 @@ import re
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH as _INSTANTIES_GRAPH
 from rce_cho_mcp.limits import LIST_MAX_LIMIT
 from rce_cho_mcp.ontology.registry import get_classes
+from rce_cho_mcp.queries import build_name_lookup_query
 from rce_cho_mcp.semantics import get_known_value_uris
 from rce_cho_mcp.sparql import escape_sparql_string, execute_sparql
 from rce_cho_mcp.sparql import rows as _sparql_rows
@@ -187,15 +188,11 @@ SELECT (COUNT(DISTINCT ?obj) AS ?aantal) WHERE {{
     count_rows = _sparql_rows(execute_sparql(count_query, timeout=_QUERY_TIMEOUT))
     aantal = int(count_rows[0]["aantal"]["value"]) if count_rows else 0
 
-    # Zelfde tweetraps-truc als largest_by_area() in area.py: eerst de
-    # kandidatenset filteren/limiteren in een binnenste SELECT DISTINCT
-    # (geen OPTIONAL), pas daarna naam/nummer via OPTIONAL toevoegen op de
-    # al-beperkte set -- vermijdt de bekende ORDER BY/OPTIONAL-504-valkuil
-    # en het cartesisch product van meerdere multi-valued OPTIONALs.
-    sample_query = f"""
-PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
-SELECT DISTINCT ?obj ?rijksmonumentnummer ?naam WHERE {{
-  {{
+    # build_name_lookup_query() wrapt dit met de standaard naam/nummer-
+    # OPTIONALs op de al-beperkte set (zie queries.py) -- zelfde tweetraps-
+    # mechanisme als largest_by_area() in area.py, nu gedeeld in plaats van
+    # met de hand herschreven.
+    inner_select = f"""{{
     SELECT DISTINCT ?obj WHERE {{
       GRAPH <{_INSTANTIES_GRAPH}> {{
         ?obj a <{class_uri}> ;
@@ -205,11 +202,12 @@ SELECT DISTINCT ?obj ?rijksmonumentnummer ?naam WHERE {{
       }}
     }}
     LIMIT {limit}
-  }}
-  OPTIONAL {{ ?obj ceo:rijksmonumentnummer ?rijksmonumentnummer . }}
-  OPTIONAL {{ ?obj ceo:heeftNaam ?nObj . ?nObj ceo:naam ?naam . }}
-}}
-"""
+  }}"""
+    sample_query = build_name_lookup_query(
+        outer_vars="?obj ?rijksmonumentnummer ?naam",
+        inner_select=inner_select,
+        subject_var="obj",
+    )
     sample_rows = _sparql_rows(execute_sparql(sample_query, timeout=_QUERY_TIMEOUT))
 
     rows = [

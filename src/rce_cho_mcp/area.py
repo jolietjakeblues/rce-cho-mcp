@@ -50,6 +50,7 @@ Geverifieerd tegen het live endpoint (2026-09-03, herbevestigd 2026-10-30):
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH as _INSTANTIES_GRAPH
 from rce_cho_mcp.limits import LIST_MAX_LIMIT
 from rce_cho_mcp.ontology.registry import get_classes
+from rce_cho_mcp.queries import build_name_lookup_query
 from rce_cho_mcp.semantics import get_known_value_uris
 from rce_cho_mcp.sparql import execute_sparql
 from rce_cho_mcp.sparql import rows as _sparql_rows
@@ -114,13 +115,7 @@ def largest_by_area(
             }
         monument_aard_filter = f"?rm ceo:heeftMonumentAard <{aard_uri}> ."
 
-    query = f"""
-PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
-PREFIX uom: <http://www.opengis.net/def/uom/OGC/1.0/>
-SELECT DISTINCT ?rm ?opp ?naam ?rijksmonumentnummer WHERE {{
-  {{
+    inner_select = f"""{{
     SELECT DISTINCT ?rm (geof:area(?wkt, uom:metre) AS ?opp)
     WHERE {{
       GRAPH <{_INSTANTIES_GRAPH}> {{
@@ -132,12 +127,18 @@ SELECT DISTINCT ?rm ?opp ?naam ?rijksmonumentnummer WHERE {{
     }}
     ORDER BY DESC(?opp)
     LIMIT {limit}
-  }}
-  OPTIONAL {{ ?rm ceo:heeftNaam ?nObj . ?nObj ceo:naam ?naam . }}
-  OPTIONAL {{ ?rm ceo:rijksmonumentnummer ?rijksmonumentnummer . }}
-}}
-ORDER BY DESC(?opp)
-"""
+  }}"""
+    query = build_name_lookup_query(
+        outer_vars="?rm ?opp ?naam ?rijksmonumentnummer",
+        inner_select=inner_select,
+        subject_var="rm",
+        extra_prefixes=(
+            "PREFIX geo: <http://www.opengis.net/ont/geosparql#>\n"
+            "PREFIX geof: <http://www.opengis.net/def/function/geosparql/>\n"
+            "PREFIX uom: <http://www.opengis.net/def/uom/OGC/1.0/>"
+        ),
+        outer_order_by="ORDER BY DESC(?opp)",
+    )
     data = execute_sparql(query, timeout=_QUERY_TIMEOUT)
     bindings = _sparql_rows(data)
 
