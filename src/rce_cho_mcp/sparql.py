@@ -408,6 +408,26 @@ def _parse_polygon_rings(rings_text: str) -> list[list[list[float]]]:
     return [_parse_ring(_strip_parens(r)) for r in _split_top_level(rings_text)]
 
 
+def _resolve_coordinate_system(first_point: list[float], convert_rd: bool) -> str | None:
+    """Decide what to do with a POLYGON/MULTIPOLYGON based on its first point.
+
+    Returns "rd" (convert every point), "wgs84" (leave as-is), or None
+    (reject the geometry -- RD coordinates without convert_rd=True, or an
+    unrecognized coordinate system). Mirrors the POINT branch's logic below,
+    factored out so POLYGON and MULTIPOLYGON can't drift apart again like
+    they did before this fix (MULTIPOLYGON used to convert unconditionally,
+    without checking _is_rd() first, and neither ever rejected RD
+    coordinates when convert_rd=False -- both silently returned bogus
+    "WGS84" coordinates far outside valid lon/lat range).
+    """
+    x, y = first_point
+    if _is_rd(x, y):
+        return "rd" if convert_rd else None
+    if abs(x) > 180 or abs(y) > 90:
+        return None  # onbekend coördinatenstelsel
+    return "wgs84"
+
+
 def wkt_to_geometry(wkt: str, convert_rd: bool = False) -> dict | None:
     """Parse a WKT string to a GeoJSON geometry dict. Returns None on failure.
 
@@ -416,39 +436,60 @@ def wkt_to_geometry(wkt: str, convert_rd: bool = False) -> dict | None:
 
     convert_rd: when True, coordinates detected as RD (EPSG:28992) are
     automatically converted to WGS84 before building the geometry.
-    When False (default), RD coordinates are rejected and None is returned.
+    When False (default), RD coordinates are rejected and None is returned
+    -- for every geometry type, not just POINT.
+
+    Any malformed numeric literal (e.g. a non-numeric coordinate) is treated
+    as a parse failure and returns None, same as an unrecognized WKT shape --
+    it never raises, so one bad row in a larger result set can be skipped by
+    the caller (see to_geojson()) instead of aborting the whole conversion.
     """
     wkt = _WKT_STRIP.sub("", wkt).strip()
 
-    m = _POINT_RE.match(wkt)
-    if m:
-        x, y = float(m.group(1)), float(m.group(2))
-        if _is_rd(x, y):
-            if not convert_rd:
-                return None  # RD-coördinaten, geen WGS84 — gebruik convert_rd=True om te converteren
-            x, y = rd_to_wgs84(x, y)
-        elif abs(x) > 180 or abs(y) > 90:
-            return None  # onbekend coördinatenstelsel
-        return {"type": "Point", "coordinates": [x, y]}
+    try:
+        m = _POINT_RE.match(wkt)
+        if m:
+            x, y = float(m.group(1)), float(m.group(2))
+            if _is_rd(x, y):
+                if not convert_rd:
+                    return None  # RD-coördinaten -- gebruik convert_rd=True om te converteren
+                x, y = rd_to_wgs84(x, y)
+            elif abs(x) > 180 or abs(y) > 90:
+                return None  # onbekend coördinatenstelsel
+            return {"type": "Point", "coordinates": [x, y]}
 
-    m = _POLYGON_RE.match(wkt)
-    if m:
-        rings = _parse_polygon_rings(m.group(1))
-        if convert_rd and rings and rings[0] and _is_rd(*rings[0][0]):
-            rings = [[list(rd_to_wgs84(p[0], p[1])) for p in ring] for ring in rings]
-        return {"type": "Polygon", "coordinates": rings}
+        m = _POLYGON_RE.match(wkt)
+        if m:
+            rings = _parse_polygon_rings(m.group(1))
+            if not rings or not rings[0]:
+                return None
+            action = _resolve_coordinate_system(rings[0][0], convert_rd)
+            if action is None:
+                return None
+            if action == "rd":
+                rings = [[list(rd_to_wgs84(p[0], p[1])) for p in ring] for ring in rings]
+            return {"type": "Polygon", "coordinates": rings}
 
-    m = _MULTIPOLYGON_RE.match(wkt)
-    if m:
-        polygons = [_parse_polygon_rings(_strip_parens(p)) for p in _split_top_level(m.group(1))]
-        if convert_rd and polygons and polygons[0] and polygons[0][0]:
+        m = _MULTIPOLYGON_RE.match(wkt)
+        if m:
             polygons = [
-                [[list(rd_to_wgs84(pt[0], pt[1])) for pt in ring] for ring in polygon]
-                for polygon in polygons
+                _parse_polygon_rings(_strip_parens(p)) for p in _split_top_level(m.group(1))
             ]
-        return {"type": "MultiPolygon", "coordinates": polygons}
+            if not polygons or not polygons[0] or not polygons[0][0]:
+                return None
+            action = _resolve_coordinate_system(polygons[0][0][0], convert_rd)
+            if action is None:
+                return None
+            if action == "rd":
+                polygons = [
+                    [[list(rd_to_wgs84(pt[0], pt[1])) for pt in ring] for ring in polygon]
+                    for polygon in polygons
+                ]
+            return {"type": "MultiPolygon", "coordinates": polygons}
 
-    return None
+        return None
+    except ValueError:
+        return None
 
 
 def to_geojson(data: dict, wkt_var: str = "wkt", convert_rd: bool = False) -> dict:

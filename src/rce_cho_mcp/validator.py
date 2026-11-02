@@ -323,8 +323,9 @@ def validate_sparql(query: str) -> dict:
     select_pos = q_upper.find("SELECT")
     from_pos = q_upper.find("FROM")
     where_pos = q_upper.find("WHERE")
+    is_ask = bool(re.search(r"\bASK\b", q_upper))
 
-    if select_pos == -1:
+    if select_pos == -1 and not is_ask:
         errors.append("SELECT ontbreekt.")
 
     if where_pos == -1:

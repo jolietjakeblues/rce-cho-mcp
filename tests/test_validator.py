@@ -25,6 +25,22 @@ def test_missing_where_is_error():
     assert any("WHERE" in e for e in result["errors"])
 
 
+def test_ask_query_is_not_rejected_for_missing_select():
+    # Regressie: de validator eiste altijd "SELECT", ook voor een geldige
+    # ASK-query -- die query_sparql() expliciet ondersteunt.
+    result = validate_sparql("ASK WHERE { ?s ?p ?o }")
+    assert result["valid"] is True
+    assert not any("SELECT ontbreekt" in e for e in result["errors"])
+
+
+def test_ask_query_without_where_still_requires_where():
+    # Dit fixt alleen de SELECT-eis voor ASK; de WHERE-eis blijft bewust
+    # ongewijzigd (niet gerapporteerd, geen scope van deze fix).
+    result = validate_sparql("ASK ?s ?p ?o")
+    assert result["valid"] is False
+    assert any("WHERE" in e for e in result["errors"])
+
+
 def test_from_before_select_is_error():
     q = "FROM <https://x> SELECT ?s WHERE { ?s ?p ?o }"
     result = validate_sparql(q)
