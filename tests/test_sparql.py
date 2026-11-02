@@ -91,6 +91,60 @@ def test_wkt_to_geometry_unknown_returns_none():
     assert wkt_to_geometry("LINESTRING(0 0, 1 1)") is None
 
 
+def test_wkt_to_geometry_multipolygon_wgs84_not_converted_when_convert_rd_true():
+    # Regressie: MULTIPOLYGON converteerde voorheen onvoorwaardelijk zodra
+    # convert_rd=True, ook als de coördinaten al WGS84 waren (bv. [5, 52]
+    # verschoof naar ~[3.3, 47.97]) -- ontbrak de _is_rd()-check die POLYGON
+    # en POINT al hadden.
+    wkt = "MULTIPOLYGON(((5 52, 5 53, 6 53, 6 52, 5 52)))"
+    geom = wkt_to_geometry(wkt, convert_rd=True)
+    assert geom["coordinates"][0][0][0] == [5, 52]
+
+
+def test_wkt_to_geometry_polygon_rd_rejected_without_convert_rd():
+    # Regressie: POLYGON/MULTIPOLYGON lieten RD-coördinaten ongewijzigd door
+    # als lon/lat wanneer convert_rd=False, i.p.v. te verwerpen zoals POINT
+    # dat al deed voor dezelfde invoer.
+    wkt = "POLYGON((155000 463000, 155000 464000, 156000 464000, 156000 463000, 155000 463000))"
+    assert wkt_to_geometry(wkt, convert_rd=False) is None
+
+
+def test_wkt_to_geometry_multipolygon_rd_rejected_without_convert_rd():
+    wkt = (
+        "MULTIPOLYGON(((155000 463000, 155000 464000, 156000 464000, "
+        "156000 463000, 155000 463000)))"
+    )
+    assert wkt_to_geometry(wkt, convert_rd=False) is None
+
+
+def test_wkt_to_geometry_polygon_rd_converted():
+    wkt = "POLYGON((155000 463000, 155000 464000, 156000 464000, 156000 463000, 155000 463000))"
+    geom = wkt_to_geometry(wkt, convert_rd=True)
+    assert geom["type"] == "Polygon"
+    lon, lat = geom["coordinates"][0][0]
+    assert abs(lon - 5.387638889) < 0.01
+    assert abs(lat - 52.156160556) < 0.01
+
+
+def test_wkt_to_geometry_multipolygon_rd_converted():
+    wkt = (
+        "MULTIPOLYGON(((155000 463000, 155000 464000, 156000 464000, "
+        "156000 463000, 155000 463000)))"
+    )
+    geom = wkt_to_geometry(wkt, convert_rd=True)
+    assert geom["type"] == "MultiPolygon"
+    lon, lat = geom["coordinates"][0][0][0]
+    assert abs(lon - 5.387638889) < 0.01
+    assert abs(lat - 52.156160556) < 0.01
+
+
+def test_wkt_to_geometry_malformed_coordinate_returns_none():
+    # Regressie: een onleesbare coördinaat (bv. "bad 52") gaf een ongevangen
+    # ValueError i.p.v. None -- brak de hele GeoJSON-export in to_geojson().
+    wkt = "POLYGON((0 0, bad 52, 10 10, 10 0, 0 0))"
+    assert wkt_to_geometry(wkt) is None
+
+
 def test_to_geojson_skips_invalid_geometry():
     data = {
         "head": {"vars": ["wkt", "naam"]},
@@ -104,6 +158,26 @@ def test_to_geojson_skips_invalid_geometry():
     out = to_geojson(data)
     assert len(out["features"]) == 1
     assert out["features"][0]["properties"]["naam"] == "A"
+    assert out["_skipped"] == 1
+
+
+def test_to_geojson_skips_malformed_row_without_crashing_other_rows():
+    data = {
+        "head": {"vars": ["wkt", "naam"]},
+        "results": {
+            "bindings": [
+                {"wkt": {"value": "POINT(4.9 52.3)"}, "naam": {"value": "A"}},
+                {
+                    "wkt": {"value": "POLYGON((0 0, bad 52, 10 10, 10 0, 0 0))"},
+                    "naam": {"value": "B"},
+                },
+                {"wkt": {"value": "POINT(5.1 52.1)"}, "naam": {"value": "C"}},
+            ]
+        },
+    }
+    out = to_geojson(data)
+    names = {f["properties"]["naam"] for f in out["features"]}
+    assert names == {"A", "C"}
     assert out["_skipped"] == 1
 
 
