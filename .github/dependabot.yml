@@ -4,6 +4,15 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # mcp 2.x is a breaking major release (FastMCP renamed/moved to
+      # MCPServer, see PR #26) -- this codebase still targets the 1.x API,
+      # so pyproject.toml's "<2" upper bound is deliberate, not an
+      # oversight. Migrating is a real future task, not something to take
+      # on via an unattended version-update PR. Minor/patch updates within
+      # 1.x (e.g. security fixes) are still proposed as normal.
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
