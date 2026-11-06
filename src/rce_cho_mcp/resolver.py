@@ -3,7 +3,7 @@ import urllib.error
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KNOWN_GRAPHS
 from rce_cho_mcp.graphs import NON_QUERYABLE_GRAPH_KEYS
 from rce_cho_mcp.pitfalls import LANGUAGE_TAG_WARNING
-from rce_cho_mcp.sparql import escape_sparql_string, execute_sparql, rows
+from rce_cho_mcp.sparql import escape_sparql_string, execute_sparql, is_safe_iri, rows
 
 PREFIXES = """PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 """
@@ -106,6 +106,13 @@ def describe_resource(
     graph: str = DEFAULT_DATASET_GRAPH,
 ) -> list[dict]:
     """Return every property/value pair known about a resource URI."""
+    if not is_safe_iri(uri):
+        raise ValueError(
+            f"Ongeldige URI: {uri!r} bevat een teken dat niet toegestaan is "
+            "binnen een SPARQL IRIREF (<...>), bv. '>', '\"' of een "
+            "spatie/controlekarakter."
+        )
+
     query = f"""SELECT ?predicate ?object
 WHERE {{
   GRAPH <{graph}> {{

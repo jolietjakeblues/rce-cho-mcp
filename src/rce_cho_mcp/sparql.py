@@ -33,6 +33,27 @@ def escape_sparql_string(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+# SPARQL 1.1 grammar: IRIREF ::= '<' ([^<>"{}|^`\]-[#x00-#x20])* '>' -- none
+# of these characters (nor space/control chars) can legally appear inside
+# <...>. A caller-supplied value containing one is either invalid SPARQL
+# syntax, or -- '>' specifically -- breaks out of the <...> token and lets
+# the rest of the string inject arbitrary graph patterns into the query.
+# escape_sparql_string() above does not help here: it escapes a value for a
+# quoted string literal ("..."), not for a bare <...> IRIREF, which has no
+# escape mechanism at all -- an unsafe character must be rejected, not
+# escaped. Use this wherever a caller-supplied string is interpolated
+# directly into <{...}> rather than resolved first (e.g. via a
+# get_classes()-style lookup) or wrapped in a string literal.
+_UNSAFE_IRI_CHARS = frozenset('<>"{}|^`\\')
+
+
+def is_safe_iri(value: str) -> bool:
+    """Return False if value contains a character that can never legally
+    appear inside a SPARQL IRIREF (<...>), so it must not be interpolated
+    there as-is."""
+    return not any(ch in _UNSAFE_IRI_CHARS or ord(ch) <= 0x20 for ch in value)
+
+
 def rows(data: dict) -> list[dict]:
     """Return the SPARQL JSON result bindings, or [] if there are none.
 

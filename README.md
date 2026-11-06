@@ -23,7 +23,7 @@ Het doel is niet alleen het uitvoeren van SPARQL, maar betrouwbare interactie me
 
 ### Status
 
-Beta (v0.2.0-beta).
+Beta (v0.5.0-beta).
 
 Niet geaffilieerd met de Rijksdienst voor het Cultureel Erfgoed.
 
@@ -213,7 +213,7 @@ The goal is not only SPARQL execution, but reliable interaction with Dutch cultu
 
 ### Status
 
-Beta (v0.2.0-beta).
+Beta (v0.5.0-beta).
 
 Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
 

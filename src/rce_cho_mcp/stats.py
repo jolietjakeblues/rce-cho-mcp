@@ -9,7 +9,7 @@ gedefinieerd maar (nog) niet gebruikt zijn.
 
 from collections.abc import Awaitable, Callable
 
-from rce_cho_mcp.sparql import execute_sparql
+from rce_cho_mcp.sparql import execute_sparql, is_safe_iri
 from rce_cho_mcp.sparql import rows as _rows
 
 CEO_NS = "https://linkeddata.cultureelerfgoed.nl/def/ceo#"
@@ -23,6 +23,19 @@ OnStep = Callable[[float, float, str], Awaitable[None]]
 
 def _clamp_sample_size(sample_size: int) -> int:
     return max(_MIN_SAMPLE_SIZE, min(sample_size, _MAX_SAMPLE_SIZE))
+
+
+def _validate_class_uri(class_uri: str) -> None:
+    """Unlike area.py/gemeente.py, this module takes class_uri as a free-form
+    URI, not a class_name resolved via get_classes() -- so it never gets the
+    implicit safety of only ever containing a URI this codebase itself
+    looked up. Reject anything that couldn't legally appear inside <...>."""
+    if not is_safe_iri(class_uri):
+        raise ValueError(
+            f"Ongeldige class_uri: {class_uri!r} bevat een teken dat niet "
+            "toegestaan is binnen een SPARQL IRIREF (<...>), bv. '>', '\"' "
+            "of een spatie/controlekarakter."
+        )
 
 
 async def dataset_totals(on_step: OnStep | None = None) -> dict[str, int | str]:
@@ -108,6 +121,7 @@ def explore_class_paths(class_uri: str, sample_size: int = 1000) -> dict:
     empirisch: het toont ook paden die niet in de ontologie gedocumenteerd
     staan, en hoe goed een pad gevuld is binnen de steekproef.
     """
+    _validate_class_uri(class_uri)
     sample_size = _clamp_sample_size(sample_size)
     query = f"""
 SELECT ?p ?target ?kind (COUNT(*) AS ?n) WHERE {{
@@ -147,6 +161,7 @@ def explore_incoming_paths(class_uri: str, sample_size: int = 1000) -> dict:
     welk complex hoort dit rijksmonument": verken inkomend op Rijksmonument
     en je vindt Complex -> heeftRijksmonument.
     """
+    _validate_class_uri(class_uri)
     sample_size = _clamp_sample_size(sample_size)
     query = f"""
 SELECT ?source_class ?p (COUNT(*) AS ?n) WHERE {{

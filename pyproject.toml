@@ -1,6 +1,6 @@
 [project]
 name = "rce-cho-mcp"
-version = "0.2.0b1"
+version = "0.5.0b1"
 description = "MCP server for querying the Dutch RCE Cultural Heritage Objects linked data endpoint"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -34,7 +34,15 @@ classifiers = [
 ]
 
 dependencies = [
-  "mcp>=1.27,<2",
+  # 1.30 is the floor, not 1.27: it's the first release patching
+  # CVE-2026-109527 (unbounded request body on HTTP server transport -- DoS)
+  # and CVE-2026-59951 (Streamable HTTP sessions never reclaimed), both High
+  # and both directly relevant to this project's deployed transport
+  # (http_server.py runs Streamable HTTP). Verified 2026-11-06 against the
+  # upstream GitHub Security Advisories for modelcontextprotocol/python-sdk,
+  # not a secondary source. No lockfile pins this further, so the floor is
+  # the only guarantee a future build won't resolve an old, vulnerable mcp.
+  "mcp>=1.30,<2",
   "rdflib>=7.0.0,<8",
   "pydantic>=2.0,<3"
 ]

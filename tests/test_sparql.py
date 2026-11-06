@@ -6,10 +6,13 @@ rows() binnen dezelfde functie overschaduwde) die hier bewust als eerste
 test staat -- precies het soort fout die een offline test direct vangt.
 """
 
+import pytest
+
 from rce_cho_mcp.sparql import (
     classify_error,
     escape_sparql_string,
     format_results,
+    is_safe_iri,
     rd_to_wgs84,
     rows,
     to_geojson,
@@ -45,6 +48,23 @@ def test_rows_helper(sparql_json, empty_sparql_json):
 
 def test_escape_sparql_string():
     assert escape_sparql_string('a"b\\c') == 'a\\"b\\\\c'
+
+
+def test_is_safe_iri_accepts_ordinary_uri():
+    assert is_safe_iri(
+        "https://linkeddata.cultureelerfgoed.nl/cho-kennis/id/rijksmonument/73336"
+    )
+
+
+def test_is_safe_iri_rejects_closing_angle_bracket():
+    # Regressie: de hoofd-SPARQL-injectiebug (zie resolver.py/brk_spatial.py/
+    # stats.py) -- '>' breekt uit <...> en de rest wordt query-syntax.
+    assert not is_safe_iri("http://evil/> } UNION { ?s ?p ?o")
+
+
+@pytest.mark.parametrize("char", list('<>"{}|^`\\') + [" ", "\n", "\t"])
+def test_is_safe_iri_rejects_each_forbidden_character(char):
+    assert not is_safe_iri(f"http://example.org/{char}x")
 
 
 def test_rd_to_wgs84_amersfoort_origin():
