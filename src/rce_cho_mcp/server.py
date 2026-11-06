@@ -546,7 +546,7 @@ def query_sparql_geojson(
     convert_rd: zet op True wanneer de query RD-coördinaten (EPSG:28992) oplevert,
                 bijvoorbeeld bij de graph 'linies' (ceo:asWKT-RD). De coördinaten
                 worden dan automatisch omgezet naar WGS84.
-    Ondersteunt POINT, POLYGON en MULTIPOLYGON.
+    Ondersteunt POINT, POLYGON, MULTIPOLYGON, LINESTRING en MULTILINESTRING.
     Alle overige variabelen worden als feature properties meegenomen.
     Rijen zonder geldige geometrie worden overgeslagen (zie '_skipped' in het resultaat).
 
@@ -613,8 +613,8 @@ def grootste_monumenten_oppervlakte(
     hebben een berekenbare oppervlakte. De meerderheid van de rijksmonumenten
     heeft alleen een POINT-geometrie (geen oppervlakte) en wordt hier dus
     niet in meegenomen -- dit is geen bug, maar een beperking van de
-    brondata. Van de rijksmonumenten met een geometrie is ongeveer 19%
-    polygoon/multipolygoon.
+    brondata. Van de rijksmonumenten met een geometrie is ongeveer 38%
+    polygoon/multipolygoon (geverifieerd 2026-11-06).
 
     limit: aantal resultaten (1-200, standaard 10).
     class_name: CEO-classnaam om op te filteren (standaard "Rijksmonument",
@@ -630,6 +630,9 @@ def grootste_monumenten_oppervlakte(
     zelf per monument de WKT op te halen: bij grotere aantallen (bv. de
     ~1.499 archeologische of ~61.500 onroerend-gebouwde rijksmonumenten)
     overschrijdt ruwe WKT al snel de tool-resultaatlimiet (zie query_sparql()).
+    Deze property bestaat in de ontologie uitsluitend op ceo:Rijksmonument --
+    bij elke andere class_name geeft monument_aard een foutmelding, laat het
+    dan weg (None).
     """
     return format_largest_by_area(
         largest_by_area(limit=limit, class_name=class_name, monument_aard=monument_aard)
@@ -637,6 +640,7 @@ def grootste_monumenten_oppervlakte(
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+@sparql_text_errors()
 def percelen_via_spatial_join(
     rijksmonument: str,
     limit: Annotated[int, Field(ge=1, le=_MAX_CANDIDATE_ROWS)] = 20,
@@ -646,13 +650,13 @@ def percelen_via_spatial_join(
     onafhankelijk van RCE's eigen BRK-relatie.
 
     BELANGRIJK, waarom deze tool bestaat: RCE's eigen ceo:BasisregistratieRelatie
-    -> ceo:heeftBRKRelatie-koppeling is NIET gegarandeerd compleet. Bij het ene
-    monument staat de volledige perceellijst (bv. ~289 percelen bij een grote
-    buitenplaats), bij het andere maar één perceel met een aantekening als
-    "exacte punt-in-perceel match" -- kennelijk een steekproef, geen
-    uitputtende lijst, zonder dat je dit vooraf aan de data kunt zien. Gebruik
-    daarom deze tool (of controleer expliciet de aannemelijkheid van het
-    aantal) in plaats van te vertrouwen op de eerste/enige BRK-treffer.
+    -> ceo:heeftBRKRelatie-koppeling is NIET gegarandeerd compleet -- het aantal
+    BRKRelatie-triples varieert enorm en zonder duidelijk patroon (geverifieerd
+    2026-11-06: minimum 1, maximum 760, gemiddeld ~2,2 per rijksmonument), en
+    een niet-triviaal aantal kan nog altijd onvolledig zijn, zonder dat je dit
+    vooraf aan de data kunt zien (zie semantics_describe_topic('kadaster')).
+    Gebruik daarom deze tool (of controleer expliciet de aannemelijkheid van
+    het aantal) in plaats van te vertrouwen op de eerste/enige BRK-treffer.
 
     Werking: haalt RCE's monumentgeometrie op (bij voorkeur POLYGON/
     MULTIPOLYGON voor volledige dekking, anders het beschikbare POINT), en

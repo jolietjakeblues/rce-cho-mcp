@@ -20,10 +20,16 @@ Geverifieerd tegen het live endpoint (2026-09-03, herbevestigd 2026-10-30):
   Met uom:metre levert het een geodetische oppervlakte in vierkante meters,
   direct uit WGS84-coordinaten (getest op een 1x1 graad vierkant nabij de
   evenaar: ~1.236e10 m2, wat overeenkomt met een ellipsoidische berekening).
-- Van de ~128.896 ceo:heeftGeometrie-triples op ceo:Rijksmonument is de
-  overgrote meerderheid (104.236) een POINT, zonder oppervlakte. Slechts
-  14.291 zijn POLYGON en 10.369 MULTIPOLYGON (~19% van het totaal) -- alleen
-  die subset kan hiermee een oppervlakte krijgen.
+- Van de 65.786 ceo:heeftGeometrie/geo:asWKT-waarden op ceo:Rijksmonument in
+  GRAPH instanties-rce (geverifieerd 2026-11-06) is de meerderheid (40.873)
+  een POINT, zonder oppervlakte. 14.284 zijn POLYGON en 10.629 MULTIPOLYGON
+  (~38% van het totaal) -- die subset kan hiermee een oppervlakte krijgen.
+  LET OP: dit zijn de aantallen in instanties-rce ALLEEN -- tel de losse
+  graph 'punten' (zie semantics_describe_topic('geometry')) hier niet
+  overheen op, dat zijn alternatieve locaties voor geometrie, geen aparte
+  extra triples; een eerdere versie van dit cijfer (~128.896/104.236) deed
+  dat wel en kwam zo op een bijna 2x te hoog totaal en een polygoon-ratio
+  (~19%) die ruim de helft te laag was.
 - BELANGRIJK, los ontdekt pitfall: de WKT-literals in deze dataset gebruiken
   gemengde hoofdletters MET spatie voor het type-keyword, bv. "Polygon (...)"
   en "Point (...)", niet de striktere vorm "POLYGON(...)" die je in externe
@@ -88,11 +94,14 @@ def largest_by_area(
 
     monument_aard: optioneel, "archeologisch" of "onroerend gebouwd" (zie
     semantics_describe_topic('monument_aard')) om te filteren op
-    ceo:heeftMonumentAard. Alleen zinvol in combinatie met class_name
-    "Rijksmonument" (het enige domain van deze property).
+    ceo:heeftMonumentAard. Deze property bestaat in de ontologie uitsluitend
+    op ceo:Rijksmonument (rdfs:domain) -- bij elke andere class_name laat je
+    monument_aard weg (None), anders krijg je een foutmelding in plaats van
+    stil 0 resultaten.
 
     Retourneert {"class_name", "class_uri", "limit", "monument_aard", "rows": [...]}
-    of {"error": ...} bij een onbekende class_name/monument_aard. Elke rij in
+    of {"error": ...} bij een onbekende class_name/monument_aard, of bij een
+    monument_aard-filter op een class die dat niet ondersteunt. Elke rij in
     "rows" heeft "rm" (URI), "oppervlakte_m2" (float), "naam" (str|None) en
     "rijksmonumentnummer" (str|None).
     """
@@ -103,6 +112,17 @@ def largest_by_area(
         return {
             "error": f"Onbekende class: {class_name}",
             "beschikbare_classes_voorbeeld": sorted(get_classes().keys())[:50],
+        }
+
+    if class_name != _DEFAULT_CLASS and monument_aard is not None:
+        return {
+            "error": (
+                f"ceo:heeftMonumentAard bestaat alleen op ceo:{_DEFAULT_CLASS} "
+                f"(rdfs:domain in de ontologie) -- class_name={class_name!r} heeft "
+                "deze property nooit, dus dit filter geeft altijd stil 0 "
+                "resultaten, zonder foutmelding. Laat monument_aard weg voor een "
+                "class buiten Rijksmonument."
+            )
         }
 
     monument_aard_filter = ""
