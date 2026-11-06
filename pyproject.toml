@@ -42,7 +42,7 @@ dependencies = [
   # upstream GitHub Security Advisories for modelcontextprotocol/python-sdk,
   # not a secondary source. No lockfile pins this further, so the floor is
   # the only guarantee a future build won't resolve an old, vulnerable mcp.
-  "mcp>=1.30,<2",
+  "mcp>=1.30,<3",
   "rdflib>=7.0.0,<8",
   "pydantic>=2.0,<3"
 ]
