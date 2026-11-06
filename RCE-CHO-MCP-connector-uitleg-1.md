@@ -110,7 +110,7 @@ De connector houdt geen afzonderlijke lokale kopie van de volledige brondata bij
 
 ## 8. De tools van de RCE CHO-connector 
 
-De RCE CHO-connector biedt op dit moment 23 acties aan. De NL-GOV- en Kadaster-connectors hebben een vergelijkbare set, toegespitst op hun eigen bronnen. Elke tool vormt een vaste bouwsteen voor een specifieke taak. De tools van de RCE CHO-connector vallen in vier groepen uiteen. 
+De RCE CHO-connector biedt op dit moment 28 acties aan. De NL-GOV- en Kadaster-connectors hebben een vergelijkbare set, toegespitst op hun eigen bronnen. Elke tool vormt een vaste bouwsteen voor een specifieke taak. De tools van de RCE CHO-connector vallen in vijf groepen uiteen. 
 
 ### A. De data en ontologie verkennen 
 
@@ -142,6 +142,8 @@ Deze tools voeren zoekopdrachten uit op de beschikbare databank.
 
 - **Query sparql geojson:** levert geografische resultaten in GeoJSON, zodat ze op een kaart kunnen worden getoond. 
 
+- **Query sparql mass:** bevraagt een apart gegevensbestand over maritiem erfgoed (scheepswrakken), met een eigen vraagtaalstructuur die niet samenvalt met de reguliere RCE CHO-gegevens. 
+
 ### C. Begrippen herkennen en vertalen 
 
 Deze tools ondersteunen de koppeling tussen woorden van gebruikers, officiële begrippen en URI's. Dat is nodig wanneer registraties verschillende labels, afkortingen of identificaties gebruiken. 
@@ -161,6 +163,18 @@ Deze tools verkleinen de kans op zoekvragen die technisch geldig lijken, maar do
 - **Convert rd to wgs84:** rekent Nederlandse rijksdriehoekscoördinaten om naar WGS84-coördinaten voor kaartgebruik. 
 
 - **Ping:** controleert of de verbinding met de connector beschikbaar is. 
+
+### E. Gemeenten, oppervlakte en kadaster 
+
+Deze tools bundelen een veelgevraagde combinatie van stappen (een gemeente eenduidig herkennen, de juiste gegevensverzameling kiezen, een gangbare filtering toepassen) tot één betrouwbare aanroep, zodat die niet telkens apart en foutgevoelig hoeft te worden opgebouwd. 
+
+- **Resolve gemeente:** herkent een gemeentenaam eenduidig, ook wanneer een gelijknamige provincie of historische gemeente voor verwarring zou kunnen zorgen. 
+
+- **Monumenten in gemeente:** telt en toont rijksmonumenten in een gekozen gemeente, inclusief de juridische status. Werkt ook voor archeologische objecten binnen die gemeente, zoals archeologische onderzoeksgebieden en vondstlocaties. 
+
+- **Grootste monumenten oppervlakte:** berekent en rangschikt monumenten op oppervlakte, rechtstreeks vanuit de beschikbare geometrie. 
+
+- **Percelen via spatial join:** bepaalt welke kadastrale percelen een rijksmonument daadwerkelijk overlapt, onafhankelijk van RCE's eigen kadasterkoppeling, die niet altijd volledig is. 
 
 ## 9. Betrouwbaarheid als ontwerpprincipe 
 
