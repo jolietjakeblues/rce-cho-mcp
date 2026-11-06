@@ -53,6 +53,91 @@ _QUERY_TIMEOUT = 60
 _MIN_LIMIT = 1
 _MAX_LIMIT = LIST_MAX_LIMIT
 
+# ceo:heeftJuridischeStatus en ceo:heeftMonumentAard hebben in de ontologie
+# rdfs:domain ceo:Rijksmonument -- geen enkele andere class (ArcheologischOnderzoeksgebied,
+# ArcheologischTerrein, Complex, Gezicht, ...) heeft deze triples, bevestigd
+# live (2026-11-06): 113.956 ceo:ArcheologischOnderzoeksgebied-instanties, 0
+# met ceo:heeftJuridischeStatus. Filteren op status/aard bij een andere
+# class_name geeft daarom altijd stil 0 resultaten, zonder foutmelding --
+# dezelfde valkuil als elders in deze server (zie o.a. semantics.py). In
+# plaats van te gokken (en bv. terug te vallen op het onbetrouwbare,
+# Rijksmonument-only ceo:gemeentenaam-tekstveld of een BAG-woonplaatsnaam)
+# geeft monumenten_in_gemeente() hieronder een expliciete foutmelding.
+_STATUS_AARD_DOMAIN_CLASS = "Rijksmonument"
+
+# ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente is RDFS-gezien op elke
+# CultuurhistorischObject-subclass toepasbaar, maar is in de PRAKTIJK bij de
+# meeste archeologische classes vrijwel nooit gevuld -- dus geen "geldt voor
+# elke class"-garantie. Live geverifieerd (2026-11-06, graph instanties-rce,
+# teller/totaal instanties van die class):
+#   Rijksmonument:                  67.494 / 67.496   (~100%)
+#   ArcheologischOnderzoeksgebied: 103.929 / 113.956   (~91%)
+#   Vondstlocatie:                 102.226 / 112.009   (~91%)
+#   ArcheologischComplex:                1 / 360.471   (~0%)
+#   ArcheologischTerrein:                1 /  13.025   (~0%)
+#   Grondsporen:                         1 /  93.007   (~0%)
+#   Vondsten:                            1 / 447.488   (~0%)
+#   Complex:                             0 /   2.834   (0%)
+#   Gezicht:                             0 /     472   (0%)
+# Voor de vier ~0%-archeologieclasses hierboven is er wel een bruikbaar
+# (niet uitputtend) alternatief: één stap omhoog via ceo:ligtInObject naar
+# de bovenliggende ArcheologischOnderzoeksgebied/Vondstlocatie/Rijksmonument,
+# die meestal zelf wel heeftGemeente heeft. Ook live geverifieerd:
+#   ArcheologischComplex via ligtInObject: 310.178 / 360.471   (~86%)
+#   Grondsporen via ligtInObject:           86.933 /  93.007   (~93%)
+#   Vondsten via ligtInObject:              414.289 / 447.488   (~93%)
+#   ArcheologischTerrein via ligtInObject:    1.811 /  13.025   (~14%,
+#     NIET bruikbaar -- de meeste terreinen hebben domweg geen
+#     ceo:ligtInObject-parent geregistreerd, direct noch indirect)
+# monumenten_in_gemeente() zet hierop geen harde blokkade (dit is geen
+# ontologie-garantie zoals _STATUS_AARD_DOMAIN_CLASS hierboven, maar een
+# datafeit dat kan verschuiven), maar geeft wel een waarschuwing mee.
+_GEMEENTE_LINK_SPARSE_NOTES: dict[str, str] = {
+    "ArcheologischComplex": (
+        "ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente is voor "
+        "ArcheologischComplex vrijwel altijd leeg (1 van 360.471 instanties, "
+        "2026-11-06) -- dit resultaat is daardoor vrijwel zeker (bijna) leeg. "
+        "Betrouwbaarder alternatief: filter op de bovenliggende "
+        "ArcheologischOnderzoeksgebied/Vondstlocatie via ceo:ligtInObject "
+        "(dekt ~86%, 310.178 van 360.471), of navigeer vanuit "
+        "monumenten_in_gemeente(class_name='ArcheologischOnderzoeksgebied', "
+        "juridische_status='alle') naar ceo:bevatObject."
+    ),
+    "ArcheologischTerrein": (
+        "ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente is voor "
+        "ArcheologischTerrein vrijwel altijd leeg (1 van 13.025 instanties, "
+        "2026-11-06) -- dit resultaat is daardoor vrijwel zeker (bijna) leeg. "
+        "Er is hiervoor ook GEEN bruikbaar ceo:ligtInObject-alternatief: "
+        "slechts 14% (1.811 van 13.025) heeft uberhaupt een containment-"
+        "parent. Overweeg een geometrische aanpak (ceo:heeftGeometrie + "
+        "spatial join) in plaats van een gemeentefilter voor deze class."
+    ),
+    "Grondsporen": (
+        "ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente is voor "
+        "Grondsporen vrijwel altijd leeg (1 van 93.007 instanties, "
+        "2026-11-06) -- dit resultaat is daardoor vrijwel zeker (bijna) "
+        "leeg. Betrouwbaarder alternatief: filter via ceo:ligtInObject op "
+        "de bovenliggende Vondstlocatie (dekt ~93%, 86.933 van 93.007)."
+    ),
+    "Vondsten": (
+        "ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente is voor "
+        "Vondsten vrijwel altijd leeg (1 van 447.488 instanties, "
+        "2026-11-06) -- dit resultaat is daardoor vrijwel zeker (bijna) "
+        "leeg. Betrouwbaarder alternatief: filter via ceo:ligtInObject op "
+        "de bovenliggende Vondstlocatie (dekt ~93%, 414.289 van 447.488)."
+    ),
+    "Complex": (
+        "ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente is voor Complex "
+        "nooit gevuld (0 van 2.834 instanties, 2026-11-06) -- dit resultaat "
+        "is daardoor altijd leeg."
+    ),
+    "Gezicht": (
+        "ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente is voor Gezicht "
+        "nooit gevuld (0 van 472 instanties, 2026-11-06) -- dit resultaat "
+        "is daardoor altijd leeg."
+    ),
+}
+
 # Eén bron: semantics_describe_topic('legal_status')/('monument_aard') --
 # zie get_known_value_uris() in semantics.py. Ook gebruikt door area.py, zodat
 # deze concept-URI's niet in meerdere modules los gedupliceerd staan.
@@ -130,16 +215,34 @@ def monumenten_in_gemeente(
     monument_aard: str | None = None,
     limit: int = 50,
 ) -> dict:
-    """Tel en toon monumenten in een gemeente, met automatische
-    gemeente-resolutie, de juiste graph en een juridische-statusfilter.
+    """Tel en toon objecten in een gemeente, met automatische
+    gemeente-resolutie, de juiste graph en (voor class_name="Rijksmonument")
+    een juridische-statusfilter. De gemeentekoppeling via
+    ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente is RDFS-gezien op
+    elke class toepasbaar, maar is in de PRAKTIJK alleen betrouwbaar gevuld
+    bij Rijksmonument (~100%), ArcheologischOnderzoeksgebied (~91%) en
+    Vondstlocatie (~91%) -- geverifieerd 2026-11-06. Bij ArcheologischComplex,
+    ArcheologischTerrein, Grondsporen, Vondsten, Complex en Gezicht is hij
+    vrijwel altijd leeg (zie _GEMEENTE_LINK_SPARSE_NOTES); voor die classes
+    geeft dit aanroep "aantal": 0 (of bijna 0) en een "waarschuwing"-sleutel
+    met een alternatief (meestal: filter op de bovenliggende class via
+    ceo:ligtInObject).
 
     juridische_status: "rijksmonument" (standaard), "voorbeschermd",
-    "geen rijksmonument", of "alle" om niet op status te filteren.
+    "geen rijksmonument", of "alle" om niet op status te filteren. Dit
+    filter (en monument_aard) bestaat in de ontologie alleen op
+    ceo:Rijksmonument -- bij elke andere class_name geef je hier "alle" (of
+    None) mee, anders komt er een foutmelding (in plaats van stil 0
+    resultaten, de valkuil die dit filter voor niet-Rijksmonument classes
+    voorheen had).
 
     Retourneert bij succes {"gemeente", "gemeente_uri", "class_name",
     "class_uri", "juridische_status", "monument_aard", "aantal", "rows"}
     ("aantal" geldt voor de volledige set, "rows" is de steekproef tot
-    limit), of {"error": ...} bij een onbekende gemeente/class/status/aard.
+    limit), plus optioneel "waarschuwing" bij een class met een vrijwel lege
+    gemeentekoppeling, of {"error": ...} bij een onbekende
+    gemeente/class/status/aard, of bij een status-/aardfilter op een class
+    die dat niet ondersteunt.
     """
     limit = _clamp_limit(limit)
 
@@ -153,6 +256,30 @@ def monumenten_in_gemeente(
             "error": f"Onbekende class: {class_name}",
             "beschikbare_classes_voorbeeld": sorted(get_classes().keys())[:50],
         }
+
+    if class_name != _STATUS_AARD_DOMAIN_CLASS:
+        if juridische_status is not None and juridische_status != "alle":
+            return {
+                "error": (
+                    f"ceo:heeftJuridischeStatus bestaat alleen op ceo:{_STATUS_AARD_DOMAIN_CLASS} "
+                    f"(rdfs:domain in de ontologie) -- class_name={class_name!r} heeft "
+                    "deze property nooit, dus dit filter geeft altijd stil 0 "
+                    "resultaten, zonder foutmelding. Geef juridische_status=\"alle\" "
+                    "mee voor een class buiten Rijksmonument (bv. "
+                    "ArcheologischOnderzoeksgebied, ArcheologischTerrein, Complex, "
+                    "Gezicht)."
+                )
+            }
+        if monument_aard is not None:
+            return {
+                "error": (
+                    f"ceo:heeftMonumentAard bestaat alleen op ceo:{_STATUS_AARD_DOMAIN_CLASS} "
+                    f"(rdfs:domain in de ontologie) -- class_name={class_name!r} heeft "
+                    "deze property nooit, dus dit filter geeft altijd stil 0 "
+                    "resultaten, zonder foutmelding. Laat monument_aard weg voor een "
+                    "class buiten Rijksmonument."
+                )
+            }
 
     status_filter = ""
     if juridische_status is not None and juridische_status != "alle":
@@ -219,7 +346,7 @@ SELECT (COUNT(DISTINCT ?obj) AS ?aantal) WHERE {{
         for row in sample_rows
     ]
 
-    return {
+    result = {
         "gemeente": gem["naam"],
         "gemeente_uri": gem["uri"],
         "class_name": class_name,
@@ -229,6 +356,10 @@ SELECT (COUNT(DISTINCT ?obj) AS ?aantal) WHERE {{
         "aantal": aantal,
         "rows": rows,
     }
+    sparse_note = _GEMEENTE_LINK_SPARSE_NOTES.get(class_name)
+    if sparse_note is not None:
+        result["waarschuwing"] = sparse_note
+    return result
 
 
 def format_monumenten_in_gemeente(result: dict) -> str:
@@ -253,6 +384,10 @@ def format_monumenten_in_gemeente(result: dict) -> str:
         f"{result['class_name']} in gemeente {result['gemeente']}{status_suffix}{aard_suffix}:",
         f"Aantal: {result['aantal']}",
         f"Gemeente-URI: {result['gemeente_uri']}",
+    ]
+    if "waarschuwing" in result:
+        lines.append(f"WAARSCHUWING: {result['waarschuwing']}")
+    lines += [
         "",
         f"Steekproef ({len(result['rows'])} van {result['aantal']}):",
         "rijksmonumentnummer | naam | uri",
