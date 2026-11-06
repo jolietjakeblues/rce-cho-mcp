@@ -54,6 +54,23 @@ def test_count_without_alias_is_error():
     assert any("alias" in e.lower() for e in result["errors"])
 
 
+def test_count_without_alias_across_multiple_lines_is_error():
+    # Regressie: een kale "SELECT COUNT(" in q_upper-substringcheck miste
+    # dezelfde fout zodra ze over meerdere regels of met dubbele spatie
+    # geschreven was.
+    q = "SELECT\n  COUNT(?s)\nWHERE { ?s ?p ?o }"
+    result = validate_sparql(q)
+    assert result["valid"] is False
+    assert any("alias" in e.lower() for e in result["errors"])
+
+
+def test_count_with_double_space_is_error():
+    q = "SELECT  COUNT(?s) WHERE { ?s ?p ?o }"
+    result = validate_sparql(q)
+    assert result["valid"] is False
+    assert any("alias" in e.lower() for e in result["errors"])
+
+
 def test_language_tagged_label_filter_warning():
     q = 'SELECT ?naam WHERE { ?rm skos:prefLabel ?naam . FILTER(?naam = "Zwolle") }'
     result = validate_sparql(q)
@@ -144,6 +161,43 @@ def test_monument_uri_concat_to_public_register_is_safe():
     )
     result = validate_sparql(q)
     assert not any("CONCAT bouwt een URI-pad" in w for w in result["warnings"])
+
+
+def test_monument_uri_concat_to_public_register_rijksmonument_path_is_safe():
+    # Dezelfde whitelist, maar nu met een pad dat wel "rijksmonument/" bevat
+    # (en dus daadwerkelijk MONUMENT_URI_CONCAT_PATTERN matcht) -- de vorige
+    # test raakte dat patroon per ongeluk niet, omdat "monumenten/" geen
+    # substring "rijksmonument" bevat.
+    q = (
+        "SELECT ?link WHERE { "
+        'BIND(URI(CONCAT("https://monumentenregister.cultureelerfgoed.nl/rijksmonument/", '
+        "?rijksmonumentnummer)) AS ?link) }"
+    )
+    result = validate_sparql(q)
+    assert not any("CONCAT bouwt een URI-pad" in w for w in result["warnings"])
+
+
+def test_monument_uri_concat_subdomain_suffix_bypass_is_detected():
+    # Regressie: SAFE_REGISTER_DOMAIN was een kale substring-check, dus
+    # "monumentenregister.cultureelerfgoed.nl.evil.com" (bevat de substring,
+    # maar is een ander domein) werd eerder onterecht als veilig aangemerkt.
+    q = (
+        "SELECT ?link WHERE { "
+        'BIND(URI(CONCAT("https://monumentenregister.cultureelerfgoed.nl.evil.com/rijksmonument/", '
+        "?rijksmonumentnummer)) AS ?link) }"
+    )
+    result = validate_sparql(q)
+    assert any("CONCAT bouwt een URI-pad" in w for w in result["warnings"])
+
+
+def test_monument_uri_concat_domain_in_path_bypass_is_detected():
+    q = (
+        "SELECT ?link WHERE { "
+        'BIND(URI(CONCAT("https://evil.com/monumentenregister.cultureelerfgoed.nl/rijksmonument/", '
+        "?rijksmonumentnummer)) AS ?link) }"
+    )
+    result = validate_sparql(q)
+    assert any("CONCAT bouwt een URI-pad" in w for w in result["warnings"])
 
 
 def test_forbidden_prefix_warning():

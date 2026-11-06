@@ -88,7 +88,47 @@ def test_wkt_to_geometry_multipolygon():
 
 
 def test_wkt_to_geometry_unknown_returns_none():
-    assert wkt_to_geometry("LINESTRING(0 0, 1 1)") is None
+    assert wkt_to_geometry("GEOMETRYCOLLECTION(POINT(0 0))") is None
+
+
+def test_wkt_to_geometry_linestring():
+    geom = wkt_to_geometry("LINESTRING(4.9041 52.3676, 5.0 52.4)")
+    assert geom == {
+        "type": "LineString",
+        "coordinates": [[4.9041, 52.3676], [5.0, 52.4]],
+    }
+
+
+def test_wkt_to_geometry_multilinestring():
+    wkt = "MULTILINESTRING((0 0, 1 1), (2 2, 3 3, 4 4))"
+    geom = wkt_to_geometry(wkt)
+    assert geom["type"] == "MultiLineString"
+    assert len(geom["coordinates"]) == 2
+    assert geom["coordinates"][1] == [[2, 2], [3, 3], [4, 4]]
+
+
+def test_wkt_to_geometry_linestring_rd_rejected_without_convert_rd():
+    wkt = "LINESTRING(155000 463000, 156000 464000)"
+    assert wkt_to_geometry(wkt, convert_rd=False) is None
+
+
+def test_wkt_to_geometry_linestring_rd_converted():
+    # Live voorbeeld uit graph 'linies' (ceo:asWKT-RD), zie semantics_describe_topic('geometry').
+    wkt = "LINESTRING(155000 463000, 156000 464000)"
+    geom = wkt_to_geometry(wkt, convert_rd=True)
+    assert geom["type"] == "LineString"
+    lon, lat = geom["coordinates"][0]
+    assert abs(lon - 5.387638889) < 0.01
+    assert abs(lat - 52.156160556) < 0.01
+
+
+def test_wkt_to_geometry_multilinestring_rd_converted():
+    wkt = "MULTILINESTRING((155000 463000, 156000 464000))"
+    geom = wkt_to_geometry(wkt, convert_rd=True)
+    assert geom["type"] == "MultiLineString"
+    lon, lat = geom["coordinates"][0][0]
+    assert abs(lon - 5.387638889) < 0.01
+    assert abs(lat - 52.156160556) < 0.01
 
 
 def test_wkt_to_geometry_multipolygon_wgs84_not_converted_when_convert_rd_true():
@@ -151,7 +191,7 @@ def test_to_geojson_skips_invalid_geometry():
         "results": {
             "bindings": [
                 {"wkt": {"value": "POINT(4.9 52.3)"}, "naam": {"value": "A"}},
-                {"wkt": {"value": "LINESTRING(0 0, 1 1)"}, "naam": {"value": "B"}},
+                {"wkt": {"value": "GEOMETRYCOLLECTION(POINT(0 0))"}, "naam": {"value": "B"}},
             ]
         },
     }

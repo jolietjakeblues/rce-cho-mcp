@@ -84,10 +84,9 @@ from __future__ import annotations
 
 import re
 import urllib.error
-import urllib.parse
 
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KKG_SPARQL_ENDPOINT
-from rce_cho_mcp.gemeente import GEMEENTE_SUFFIX_RE as _GEMEENTE_SUFFIX_RE
+from rce_cho_mcp.gemeente import _OWMS_GRAPH
 from rce_cho_mcp.sparql import escape_sparql_string as _escape_sparql_string
 from rce_cho_mcp.sparql import execute_sparql, post_sparql
 from rce_cho_mcp.sparql import rows as _rows
@@ -134,11 +133,27 @@ SELECT DISTINCT ?wkt WHERE {{
 """
     wkt_rows = _rows(execute_sparql(query, timeout=_RCE_TIMEOUT))
 
+    # Haalt de officiële skos:prefLabel uit de OWMS-graph op, i.p.v. de naam
+    # af te leiden uit het laatste padsegment van de gemeente-URI (de vorige
+    # aanpak, _gemeente_naam_from_owms(), inmiddels verwijderd). Die
+    # URI-mangeling breekt stil bij gemeenten met diakrieten: de OWMS-URI
+    # voor "Súdwest-Fryslân" is bv. .../Sudwest_Fryslan (zonder diakrieten),
+    # wat een KKG-join op imxgeo:naam ("Súdwest-Fryslân", MET diakrieten)
+    # nooit kan matchen -- live bevestigd (2026-11-06) op minstens 6
+    # OWMS-gemeenten met diakrieten (Gaasterlân-Sleat, Noardeast-Fryslân,
+    # Skarsterlân, Súdwest-Fryslân, Wûnseradiel, ...). Resultaat was een
+    # stille 0-percelen-uitkomst, met format_percelen_via_spatial_join()
+    # die daarbij actief naar de verkeerde oorzaak wees ("gemeentegrens").
     gemeente_query = f"""
 PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
-SELECT DISTINCT ?gemeenteUri WHERE {{
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+SELECT DISTINCT ?gemeenteUri ?naam WHERE {{
   <{rm_uri}> ceo:heeftBasisregistratieRelatie ?br .
   ?br ceo:heeftGemeente ?gemeenteUri .
+  GRAPH <{_OWMS_GRAPH}> {{
+    ?gemeenteUri skos:prefLabel ?naam .
+  }}
+  FILTER(LANG(?naam) = "nl")
 }}
 """
     gemeente_rows = _rows(execute_sparql(gemeente_query, timeout=_RCE_TIMEOUT))
@@ -146,6 +161,7 @@ SELECT DISTINCT ?gemeenteUri WHERE {{
     return {
         "wkts": [r["wkt"]["value"] for r in wkt_rows],
         "gemeente_uris": [r["gemeenteUri"]["value"] for r in gemeente_rows],
+        "gemeente_namen": [r["naam"]["value"] for r in gemeente_rows],
     }
 
 
@@ -166,15 +182,6 @@ def _pick_best_geometry(wkts: list[str]) -> tuple[str, str] | None:
         if kind in by_kind:
             return by_kind[kind], kind
     return None
-
-
-def _gemeente_naam_from_owms(owms_uri: str) -> str | None:
-    if not owms_uri:
-        return None
-    segment = owms_uri.rsplit("/", 1)[-1]
-    segment = urllib.parse.unquote(segment)
-    segment = _GEMEENTE_SUFFIX_RE.sub("", segment)
-    return segment.replace("_", " ").strip() or None
 
 
 def _monument_area_m2(wkt: str, kind: str) -> float | None:
@@ -238,13 +245,7 @@ def percelen_via_spatial_join(rijksmonument: str, limit: int = 20) -> dict:
         return {"error": f"Kon geometrietype niet bepalen voor {rm_uri}."}
     wkt, kind = picked
 
-    gemeente_namen = [
-        naam
-        for naam in (
-            _gemeente_naam_from_owms(uri) for uri in geo_info["gemeente_uris"]
-        )
-        if naam
-    ]
+    gemeente_namen = geo_info["gemeente_namen"]
     if not gemeente_namen:
         return {
             "error": (

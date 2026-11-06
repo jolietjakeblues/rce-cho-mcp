@@ -67,11 +67,36 @@ MONUMENT_URI_CONCAT_PATTERN = re.compile(
 )
 
 SAFE_REGISTER_DOMAIN = "monumentenregister.cultureelerfgoed.nl"
+# Ankert op de exacte host (direct na het schema, direct gevolgd door "/" of
+# einde string) i.p.v. een kale substring-check. Een kale "SAFE_REGISTER_DOMAIN
+# in literal_prefix"-check (de vorige implementatie) liet een
+# subdomain-/padtruc stil door, bv.
+# "https://monumentenregister.cultureelerfgoed.nl.evil.com/rijksmonument/"
+# (bevat de substring, maar de werkelijke host is evil.com) of
+# "https://evil.com/monumentenregister.cultureelerfgoed.nl/rijksmonument/"
+# (substring zit in het pad, niet de host) -- beide zouden onterecht als
+# veilig zijn aangemerkt. Live geverifieerd (2026-11-06) dat deze anchored
+# regex beide trucs wel vlagt, en de legitieme
+# "https://monumentenregister.cultureelerfgoed.nl/rijksmonument/..." nog
+# steeds correct overslaat.
+_SAFE_REGISTER_URL_RE = re.compile(
+    r"^https?://" + re.escape(SAFE_REGISTER_DOMAIN) + r"(/|$)",
+    re.IGNORECASE,
+)
 
 # Detecteert een variabele gebonden via geo:asWKT (polygoongeometrie kan
 # duizenden tekens per rij zijn -- zie _find_large_wkt_result_risk).
 WKT_BINDING_PATTERN = re.compile(r"geo:asWKT\s+\?(\w+)", re.IGNORECASE)
 LIMIT_PATTERN = re.compile(r"\bLIMIT\s+(\d+)", re.IGNORECASE)
+
+# Detecteert een niet-aliaste COUNT direct na SELECT (bv. "SELECT COUNT(...)"),
+# ongeacht hoeveel/welk whitespace ertussen staat (spatie, tab, newline --
+# \s dekt ze allemaal). Een kale "SELECT COUNT(" in q_upper-substringcheck
+# (de vorige implementatie) miste dezelfde fout zodra ze over meerdere
+# regels of met dubbele spatie geschreven was. Matcht bewust NIET de
+# veilige, aliaste vorm "SELECT (COUNT(...) AS ?n)" -- daar staat een "("
+# vóór "COUNT", dus COUNT volgt niet direct op SELECT + whitespace.
+UNALIASED_SELECT_COUNT_PATTERN = re.compile(r"SELECT\s+COUNT\s*\(", re.IGNORECASE)
 
 # Gemeten 2026-09-03: 100 rijen polygoon-WKT van archeologische
 # rijksmonumenten was al >500.000 tekens en overschreed de tool-
@@ -81,7 +106,8 @@ _SAFE_WKT_LIMIT = 30
 
 
 def _find_order_by_optional_timeout_risk(query: str) -> list[str]:
-    """Detecteer ORDER BY gecombineerd met OPTIONAL-joins.
+    """Detecteer ORDER BY gecombineerd met OPTIONAL-joins op een NOG
+    onbeperkte resultatenset.
 
     Bevestigd (2026-07): dit combinatiepatroon veroorzaakt consistent een
     HTTP 504 op dit endpoint, zelfs met een kleine LIMIT -- de triplestore
@@ -89,10 +115,33 @@ def _find_order_by_optional_timeout_risk(query: str) -> list[str]:
     LIMIT/OFFSET wordt toegepast. Niet opnieuw per-endpoint geverifieerd
     tussen SPARQL_ENDPOINT ("Speedy") en SPARQL_FALLBACK_ENDPOINT
     ("Virtuoso") -- zie config.py.
+
+    Vlagt NIET het door dit bestand elders aanbevolen tweetraps-patroon
+    (TWO_STAGE_SUBQUERY_REMEDY zelf, zie o.a. grootste_monumenten_oppervlakte()
+    in area.py en build_name_lookup_query() in queries.py): een binnenste
+    "{ SELECT ... ORDER BY ... LIMIT N }" die zelf geen OPTIONAL bevat,
+    gevolgd door OPTIONAL-joins in de buitenste query op de al-beperkte set.
+    Dat patroon veroorzaakt geen 504 -- het risico zit in ORDER BY over een
+    nog onbeperkte OPTIONAL-gejoinde set, niet in de combinatie ORDER BY +
+    OPTIONAL op zich. Live herbevestigd (2026-11-06) met de exacte query
+    van grootste_monumenten_oppervlakte(): voorheen gaf deze validator daar
+    zelf ten onrechte een 504-waarschuwing op.
+
+    Heuristiek (geen echte SPARQL-parser): als de EERSTE LIMIT in de query
+    textueel vóór de EERSTE OPTIONAL staat, gaan we ervan uit dat die LIMIT
+    een begrenzende subquery afsluit die aan de OPTIONALs voorafgaat, en
+    waarschuwen we niet. Dit kan in theorie een LIMIT missen die toevallig
+    voor een OPTIONAL staat zonder die daadwerkelijk te begrenzen (bv. in
+    een ongerelateerde UNION-tak) -- net als de andere heuristieken in dit
+    bestand is dit een praktische benadering, geen garantie.
     """
     if "ORDER BY" not in query.upper():
         return []
-    if not OPTIONAL_BLOCK_PATTERN.search(query):
+    optional_match = OPTIONAL_BLOCK_PATTERN.search(query)
+    if not optional_match:
+        return []
+    limit_match = LIMIT_PATTERN.search(query)
+    if limit_match and limit_match.start() < optional_match.start():
         return []
     return [TWO_STAGE_SUBQUERY_REMEDY]
 
@@ -129,7 +178,7 @@ def _find_monument_uri_concat_risk(query: str) -> list[str]:
     warnings = []
     for match in MONUMENT_URI_CONCAT_PATTERN.finditer(query):
         literal_prefix, segment, var = match.groups()
-        if SAFE_REGISTER_DOMAIN in literal_prefix.lower():
+        if _SAFE_REGISTER_URL_RE.match(literal_prefix):
             continue
         warnings.append(
             f'CONCAT bouwt een URI-pad ".../{segment}/" op door ?{var} direct '
@@ -360,7 +409,7 @@ def validate_sparql(query: str) -> dict:
             "Bij cross-graph queries kan een andere aanpak nodig zijn."
         )
 
-    if "SELECT COUNT(" in q_upper:
+    if UNALIASED_SELECT_COUNT_PATTERN.search(q):
         errors.append(
             "Gebruik een alias bij COUNT: "
             "SELECT (COUNT(DISTINCT ?rm) AS ?aantal)"

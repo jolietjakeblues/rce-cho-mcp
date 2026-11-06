@@ -146,7 +146,6 @@ _MONUMENT_AARD_URIS = get_known_value_uris("monument_aard")
 
 # Normaliseert invoer die de gebruiker soms al in wiki/URI-stijl aanlevert
 # (zie memory rce-monumentadressen-datakwaliteit), bv. "Utrecht (gemeente)".
-# Ook gebruikt door brk_spatial.py (gemeentenaam afgeleid uit een OWMS-URI).
 GEMEENTE_SUFFIX_RE = re.compile(r"[_ ]?\(gemeente\)$", re.IGNORECASE)
 
 

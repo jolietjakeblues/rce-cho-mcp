@@ -3,7 +3,7 @@
 from rce_cho_mcp.area import _MONUMENT_AARD_URIS as area_aard_uris
 from rce_cho_mcp.area import _clamp_limit as area_clamp_limit
 from rce_cho_mcp.gemeente import _MONUMENT_AARD_URIS as gemeente_aard_uris
-from rce_cho_mcp.gemeente import GEMEENTE_SUFFIX_RE, _normalize_gemeente_naam
+from rce_cho_mcp.gemeente import _normalize_gemeente_naam
 from rce_cho_mcp.gemeente import _clamp_limit as gemeente_clamp_limit
 from rce_cho_mcp.limits import LIST_MAX_LIMIT
 
@@ -29,7 +29,12 @@ def test_normalize_gemeente_naam_strips_wiki_suffix():
     assert _normalize_gemeente_naam("  Zwolle  ") == "Zwolle"
 
 
-def test_gemeente_suffix_regex_is_shared_with_brk_spatial():
-    from rce_cho_mcp.brk_spatial import _GEMEENTE_SUFFIX_RE
+def test_owms_graph_is_shared_with_brk_spatial():
+    """brk_spatial.py haalt de gemeentenaam op via een skos:prefLabel-lookup
+    in dezelfde OWMS-graph als resolve_gemeente() hier (niet langer door de
+    naam uit de OWMS-URI te mangelen -- dat brak stil bij diakrieten, bv.
+    "Súdwest-Fryslân", zie brk_spatial._fetch_geometry_and_gemeentes)."""
+    from rce_cho_mcp.brk_spatial import _OWMS_GRAPH as brk_owms_graph
+    from rce_cho_mcp.gemeente import _OWMS_GRAPH as gemeente_owms_graph
 
-    assert _GEMEENTE_SUFFIX_RE is GEMEENTE_SUFFIX_RE
+    assert brk_owms_graph is gemeente_owms_graph

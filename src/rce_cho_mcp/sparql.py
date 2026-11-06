@@ -354,6 +354,11 @@ _WKT_STRIP = re.compile(r"\^\^<[^>]+>$")
 _POINT_RE = re.compile(r"^POINT\s*\(\s*([0-9.eE+-]+)\s+([0-9.eE+-]+)\s*\)$", re.IGNORECASE)
 _POLYGON_RE = re.compile(r"^POLYGON\s*\((.+)\)$", re.IGNORECASE | re.DOTALL)
 _MULTIPOLYGON_RE = re.compile(r"^MULTIPOLYGON\s*\((.+)\)$", re.IGNORECASE | re.DOTALL)
+# Anchored at ^, so e.g. "MULTILINESTRING(...)" never matches _LINESTRING_RE
+# (it doesn't start with the literal text "LINESTRING") -- same mutual
+# exclusivity as POLYGON vs MULTIPOLYGON above, match order doesn't matter.
+_LINESTRING_RE = re.compile(r"^LINESTRING\s*\((.+)\)$", re.IGNORECASE | re.DOTALL)
+_MULTILINESTRING_RE = re.compile(r"^MULTILINESTRING\s*\((.+)\)$", re.IGNORECASE | re.DOTALL)
 
 
 def _parse_coord_pair(pair: str) -> list[float]:
@@ -431,8 +436,14 @@ def _resolve_coordinate_system(first_point: list[float], convert_rd: bool) -> st
 def wkt_to_geometry(wkt: str, convert_rd: bool = False) -> dict | None:
     """Parse a WKT string to a GeoJSON geometry dict. Returns None on failure.
 
-    Supports POINT, POLYGON and MULTIPOLYGON, including interior rings
-    (holes) on POLYGON/MULTIPOLYGON.
+    Supports POINT, POLYGON, MULTIPOLYGON, LINESTRING and MULTILINESTRING,
+    including interior rings (holes) on POLYGON/MULTIPOLYGON. LINESTRING/
+    MULTILINESTRING were added 2026-11-06: the 'linies' graph's
+    ceo:asWKT-RD property (see query_sparql_geojson()'s docstring) uses
+    exactly this shape, in RD coordinates -- before this, every row from
+    that graph was silently skipped (an unrecognized WKT shape, same as any
+    other parse failure), giving an always-empty FeatureCollection despite
+    being the tool's own documented example.
 
     convert_rd: when True, coordinates detected as RD (EPSG:28992) are
     automatically converted to WGS84 before building the geometry.
@@ -486,6 +497,34 @@ def wkt_to_geometry(wkt: str, convert_rd: bool = False) -> dict | None:
                     for polygon in polygons
                 ]
             return {"type": "MultiPolygon", "coordinates": polygons}
+
+        m = _LINESTRING_RE.match(wkt)
+        if m:
+            line = _parse_ring(m.group(1))
+            if not line:
+                return None
+            action = _resolve_coordinate_system(line[0], convert_rd)
+            if action is None:
+                return None
+            if action == "rd":
+                line = [list(rd_to_wgs84(p[0], p[1])) for p in line]
+            return {"type": "LineString", "coordinates": line}
+
+        m = _MULTILINESTRING_RE.match(wkt)
+        if m:
+            # Structurally identical to a MULTIPOLYGON's list-of-rings (each
+            # top-level comma-separated, paren-wrapped piece is one flat
+            # coordinate list) -- _parse_polygon_rings() already does exactly
+            # this split+parse, so it's reused as-is rather than duplicated.
+            lines = _parse_polygon_rings(m.group(1))
+            if not lines or not lines[0]:
+                return None
+            action = _resolve_coordinate_system(lines[0][0], convert_rd)
+            if action is None:
+                return None
+            if action == "rd":
+                lines = [[list(rd_to_wgs84(p[0], p[1])) for p in line] for line in lines]
+            return {"type": "MultiLineString", "coordinates": lines}
 
         return None
     except ValueError:
