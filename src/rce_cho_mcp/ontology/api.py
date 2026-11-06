@@ -6,7 +6,6 @@ from rce_cho_mcp.ontology.registry import (
     search_ontology,
 )
 
-
 __all__ = [
     "describe_class",
     "describe_property",

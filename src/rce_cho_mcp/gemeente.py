@@ -286,7 +286,8 @@ def monumenten_in_gemeente(
         if status_uri is None:
             return {
                 "error": f"Onbekende juridische_status: {juridische_status!r}",
-                "beschikbare_juridische_status_waarden": sorted(_LEGAL_STATUS_URIS.keys()) + ["alle"],
+                "beschikbare_juridische_status_waarden": sorted(_LEGAL_STATUS_URIS.keys())
+                + ["alle"],
             }
         status_filter = f"?obj ceo:heeftJuridischeStatus <{status_uri}> ."
 

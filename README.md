@@ -1,4 +1,13 @@
+<p align="center">
+  <img src="docs/logo.svg" alt="RCE CHO MCP logo" width="140">
+</p>
+
 # rce-cho-mcp
+
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+[![License](https://img.shields.io/badge/license-EUPL--1.2-green)](LICENSE)
+![Status](https://img.shields.io/badge/status-beta-yellow)
+[![Continuous integration](https://github.com/jolietjakeblues/rce-cho-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/jolietjakeblues/rce-cho-mcp/actions/workflows/ci.yml)
 
 **Nederlands** | [English](#english)
 

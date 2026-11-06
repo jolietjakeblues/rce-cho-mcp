@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+
 from rdflib import Graph
 
 ONTOLOGY_FILE = Path(__file__).parent / "CEO_RCE.ttl"

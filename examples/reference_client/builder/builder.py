@@ -1,4 +1,3 @@
-from rce_cho_mcp.config import DEFAULT_GRAPH
 from reference_client.planner.models import QueryPlan
 
 

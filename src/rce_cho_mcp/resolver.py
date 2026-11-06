@@ -5,7 +5,6 @@ from rce_cho_mcp.graphs import NON_QUERYABLE_GRAPH_KEYS
 from rce_cho_mcp.pitfalls import LANGUAGE_TAG_WARNING
 from rce_cho_mcp.sparql import escape_sparql_string, execute_sparql, rows
 
-
 PREFIXES = """PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 """
 
