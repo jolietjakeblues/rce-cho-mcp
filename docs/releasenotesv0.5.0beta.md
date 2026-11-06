@@ -1,8 +1,9 @@
-## rce-cho-mcp — 2026-11-06 fixes (post v0.2.0-beta, no version bump yet)
+## rce-cho-mcp v0.5.0-beta
 
-Prompted by a user report that `monumenten_in_gemeente()` silently fell back
-to an unreliable path for archaeological objects. A full audit of the
-codebase followed; this lists what was fixed, not just the triggering bug.
+Highlights since `v0.2.0-beta`. Prompted by a user report that
+`monumenten_in_gemeente()` silently fell back to an unreliable path for
+archaeological objects. A full audit of the codebase followed; this lists
+what was fixed, not just the triggering bug.
 
 - `monumenten_in_gemeente()`/`largest_by_area()`: `juridische_status`/
   `monument_aard` now raise an explicit error when combined with a
@@ -35,7 +36,24 @@ codebase followed; this lists what was fixed, not just the triggering bug.
   GRAPH-restriction contradiction between the `functions` and
   `legal_status`/`monument_aard` topics) against freshly re-verified live
   data, each now dated so future drift is easier to spot
-- README, CAPABILITIES.md and architecture.md updated to reflect the above
+- `render.yaml` cleaned up to match the actual Docker-based deployment
+  (it previously described an unused Python buildpack config)
+- Added a CI workflow (`.github/workflows/ci.yml`): the test suite now runs
+  on every push/PR across Python 3.11-3.14, plus a `ruff check .` lint pass
+- Fixed all 26 pre-existing `ruff` findings (import ordering, one unused
+  import, line-length) so lint could be added to CI without starting red;
+  every line-wrap was verified against the original text to confirm no
+  string content changed, only source formatting
+- Added a project logo (`docs/logo.svg`) and status badges (Python version,
+  license, beta status, CI) to the README
+- README, CAPABILITIES.md, architecture.md and CLAUDE_DESKTOP.md updated to
+  reflect the above -- the last one also corrected a stale claim that
+  remote HTTP deployment was a future feature; it has been live on Render
+  since before this release
+
+Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
+
+---
 
 ## rce-cho-mcp v0.2.0-beta
 

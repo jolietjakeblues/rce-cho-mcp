@@ -88,7 +88,7 @@ import urllib.error
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KKG_SPARQL_ENDPOINT
 from rce_cho_mcp.gemeente import _OWMS_GRAPH
 from rce_cho_mcp.sparql import escape_sparql_string as _escape_sparql_string
-from rce_cho_mcp.sparql import execute_sparql, post_sparql
+from rce_cho_mcp.sparql import execute_sparql, is_safe_iri, post_sparql
 from rce_cho_mcp.sparql import rows as _rows
 
 _KKG_TIMEOUT = 60
@@ -107,6 +107,12 @@ def _resolve_rijksmonument_uri(identifier: str) -> str | None:
     rijksmonumentnummer (xsd:string in de brondata, zie identifiers-topic)."""
     identifier = str(identifier).strip()
     if identifier.startswith("http"):
+        if not is_safe_iri(identifier):
+            raise ValueError(
+                f"Ongeldige rijksmonument-URI: {identifier!r} bevat een teken "
+                "dat niet toegestaan is binnen een SPARQL IRIREF (<...>), bv. "
+                "'>', '\"' of een spatie/controlekarakter."
+            )
         return identifier
 
     nummer = _escape_sparql_string(identifier)
@@ -228,7 +234,10 @@ def percelen_via_spatial_join(rijksmonument: str, limit: int = 20) -> dict:
     "percelen_top" getoond worden. aantal_percelen/totale oppervlakte gelden
     voor de volledige set (tot _MAX_CANDIDATE_ROWS), niet alleen de top.
     """
-    rm_uri = _resolve_rijksmonument_uri(rijksmonument)
+    try:
+        rm_uri = _resolve_rijksmonument_uri(rijksmonument)
+    except ValueError as e:
+        return {"error": str(e)}
     if rm_uri is None:
         return {"error": f"Kon geen rijksmonument vinden voor '{rijksmonument}'."}
 

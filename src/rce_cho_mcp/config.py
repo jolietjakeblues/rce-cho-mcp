@@ -60,7 +60,7 @@ for _row in KNOWN_GRAPH_ROWS:
 
 del _row
 
-USER_AGENT = "rce-cho-mcp/0.2.0b1"
+USER_AGENT = "rce-cho-mcp/0.5.0b1"
 
 # Kadaster Kennisgraph (KKG) SPARQL-endpoint, gebruikt door brk_spatial.py voor
 # de spatial join tussen RCE-monumentgeometrie en Kadaster-percelen. Zelfde

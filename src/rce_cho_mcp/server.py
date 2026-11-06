@@ -438,7 +438,7 @@ def describe_resource_uri(uri: str) -> str:
     """Beschrijf een resource: alle predicaten en waarden van een URI in de RCE-graph."""
     try:
         facts = describe_resource(uri)
-    except RuntimeError as e:
+    except (ValueError, RuntimeError) as e:
         return f"Fout bij opvragen van resource: {e}"
 
     if not facts:
