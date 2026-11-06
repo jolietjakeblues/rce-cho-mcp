@@ -1,15 +1,8 @@
 services:
   - type: web
     name: rce-cho-mcp
-    runtime: python
-
-    buildCommand: pip install -e .
-
-    startCommand: python -m rce_cho_mcp.http_server
+    runtime: docker
 
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.0
-
       - key: RCE_CHO_GRAPH
         value: https://linkeddata.cultureelerfgoed.nl/graph/instanties-rce

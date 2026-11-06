@@ -94,8 +94,21 @@ python -m rce_cho_mcp.server
 * Verify the file paths.
 * Check the Claude logs for startup errors.
 
-## Future deployment
+## Remote deployment
 
-The current installation model assumes a local MCP server.
+The configuration above runs a local MCP server over stdio -- useful for
+development, or to pick up local source changes immediately (a running
+local server does **not** reload code automatically; restart it, or
+disconnect/reconnect the server in Claude Desktop, after editing the
+source).
 
-Future versions may support remote HTTP MCP deployment, allowing users to connect by URL without installing Python locally.
+A hosted version of this server is also deployed on Render at
+`https://rce-cho-mcp.onrender.com`, speaking MCP over Streamable HTTP
+(see `render.yaml`, `Dockerfile` and `http_server.py`). Connect a client
+to it by adding it as a remote MCP connector pointing at that URL --
+in Claude, via Settings > Connectors rather than editing this JSON file
+(the JSON file above is for locally-run, command-based servers only).
+Running both the local `rce-cho` entry above and a remote connector to
+the hosted URL at the same time is normal and lets you compare the two:
+a local server reflects whatever is on disk right now, the hosted one
+reflects whatever was last deployed to Render.

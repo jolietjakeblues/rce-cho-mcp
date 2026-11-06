@@ -194,9 +194,9 @@ De resolver kiest nooit zelf tussen meerdere resultaten.
 
 ### 5a. Gemeente & monumentenlijsten
 
-Combineert gemeente-resolutie, de juiste graph en een standaard
-juridische-statusfilter in één aanroep, in plaats van drie losse,
-foutgevoelige stappen.
+Combineert gemeente-resolutie, de juiste graph en (voor `class_name`
+"Rijksmonument") een standaard juridische-statusfilter in één aanroep, in
+plaats van drie losse, foutgevoelige stappen.
 
 Huidige tools:
 
@@ -206,6 +206,17 @@ Huidige tools:
 `resolve_gemeente` filtert, anders dan een kale `resolve_concept_label`, altijd
 op `rdf:type owms:Gemeente` zodat een gelijknamige provincie of kadastrale
 gemeente (bv. "Utrecht") niet als kandidaat meekomt.
+
+`monumenten_in_gemeente` werkt niet alleen voor `Rijksmonument`: de
+gemeentekoppeling (`ceo:heeftBasisregistratieRelatie`/`ceo:heeftGemeente`) is
+ook bruikbaar voor archeologische classes zoals `ArcheologischOnderzoeksgebied`
+en `Vondstlocatie` (`juridische_status="alle"`, dat filter bestaat alleen op
+Rijksmonument). Bij classes waar die koppeling vrijwel nooit gevuld is
+(`ArcheologischComplex`, `ArcheologischTerrein`, `Grondsporen`, `Vondsten`,
+`Complex`, `Gezicht`) geeft de tool een `waarschuwing`-veld met het beste
+alternatief in plaats van een stil leeg resultaat — zie
+"Bekende performance- en datakwaliteitskenmerken" hieronder en
+`semantics_describe_topic('archaeology')`.
 
 ### 5c. Oppervlakte & kadaster
 
@@ -448,6 +459,23 @@ verwijst.
   `rijksmonumentnummer "21625"` heeft. Een zelf opgebouwde URI faalt hier niet
   met een foutmelding — hij levert stilzwijgend het verkeerde monument.
   Filter altijd op `ceo:rijksmonumentnummer` en laat de query de URI opzoeken.
+- **Gemeentekoppeling (`ceo:heeftBasisregistratieRelatie`/`ceo:heeftGemeente`)
+  is niet op elke class even compleet gevuld**: betrouwbaar (~91-100%) bij
+  `Rijksmonument`, `ArcheologischOnderzoeksgebied` en `Vondstlocatie`, maar
+  vrijwel altijd leeg (0-1 instantie op tienduizenden tot honderdduizenden)
+  bij `ArcheologischComplex`, `ArcheologischTerrein`, `Grondsporen`,
+  `Vondsten`, `Complex` en `Gezicht` (geverifieerd 2026-11-06). Voor de eerste
+  vier daarvan dekt één stap omhoog via `ceo:ligtInObject` naar de
+  bovenliggende class 86-93%; voor `ArcheologischTerrein` bestaat geen
+  bruikbaar alternatief binnen deze dataset. `monumenten_in_gemeente()` geeft
+  bij een dunne class een `waarschuwing`-veld in plaats van een stil leeg
+  resultaat — zie `semantics_describe_topic('archaeology')` voor de volledige
+  cijfers en alternatieven. Dezelfde domeinbeperking geldt voor
+  `ceo:heeftJuridischeStatus`/`ceo:heeftMonumentAard`: die bestaan in de
+  ontologie uitsluitend op `ceo:Rijksmonument` (rdfs:domain), dus
+  `monumenten_in_gemeente()`/`grootste_monumenten_oppervlakte()` geven een
+  foutmelding i.p.v. een stille 0 als je `juridische_status`/`monument_aard`
+  combineert met een andere `class_name`.
 
 ## Belangrijk ontwerpprincipe
 
