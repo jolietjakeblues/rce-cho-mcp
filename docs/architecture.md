@@ -237,8 +237,13 @@ and describes an arbitrary resource URI (all its predicates and values).
 
 Resolves a municipality name to its OWMS concept URI (disambiguated
 against same-named provinces/cadastral municipalities), and combines
-that with the right graph and a default legal-status filter to list
-monuments in a municipality in one call.
+that with the right graph and (for `class_name="Rijksmonument"`) a
+default legal-status filter to list objects in a municipality in one
+call. Not limited to Rijksmonument: the municipality link itself works
+for any class, including archaeological ones (`ArcheologischOnderzoeksgebied`,
+`Vondstlocatie`), but `ceo:heeftJuridischeStatus`/`ceo:heeftMonumentAard`
+only exist on Rijksmonument (rdfs:domain), so a status/aard filter on any
+other class returns an explicit error instead of a silent empty result.
 
 ---
 
@@ -264,7 +269,12 @@ complete) BRK relation.
 Shared SPARQL query-building helper for the two-stage subquery pattern
 (inner `SELECT DISTINCT` without `OPTIONAL`, outer query adding name/
 rijksmonumentnummer via `OPTIONAL` on the already-limited candidate
-set) used by both `area.py` and `gemeente.py`.
+set) used by both `area.py` and `gemeente.py`. The name lookup tries two
+paths: `ceo:heeftNaam`/`ceo:naam` (Rijksmonument only) and
+`ceo:heeftLocatieAanduiding`/`ceo:locatienaam` (works on any
+`CultuurhistorischObject`, e.g. archaeological classes that have no
+`heeftNaam`) -- safe to combine, verified never more than one distinct
+name per object on either path.
 
 ---
 

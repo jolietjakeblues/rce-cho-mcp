@@ -103,7 +103,7 @@ In tegenstelling tot de ontologietools hierboven (die beschrijven wat er *gedefi
 
 **Gemeente & monumentenlijsten:** `resolve_gemeente`, `monumenten_in_gemeente`
 
-`resolve_gemeente` disambigueert een gemeentenaam tegen gelijknamige provincies/kadastrale gemeenten. `monumenten_in_gemeente` combineert gemeente-resolutie, de juiste graph en een standaard juridische-statusfilter in één aanroep.
+`resolve_gemeente` disambigueert een gemeentenaam tegen gelijknamige provincies/kadastrale gemeenten. `monumenten_in_gemeente` combineert gemeente-resolutie, de juiste graph en (voor Rijksmonument) een standaard juridische-statusfilter in één aanroep — werkt ook voor archeologische classes als `ArcheologischOnderzoeksgebied` en `Vondstlocatie`.
 
 **Oppervlakte & kadaster:** `grootste_monumenten_oppervlakte`, `percelen_via_spatial_join`
 
@@ -293,7 +293,7 @@ Unlike the ontology tools above (which describe what is *defined* in the bundled
 
 **Municipality & monument lists:** `resolve_gemeente`, `monumenten_in_gemeente`
 
-`resolve_gemeente` disambiguates a municipality name against same-named provinces/cadastral municipalities. `monumenten_in_gemeente` combines municipality resolution, the right graph and a default legal-status filter in a single call.
+`resolve_gemeente` disambiguates a municipality name against same-named provinces/cadastral municipalities. `monumenten_in_gemeente` combines municipality resolution, the right graph and (for Rijksmonument) a default legal-status filter in a single call — also works for archaeological classes such as `ArcheologischOnderzoeksgebied` and `Vondstlocatie`.
 
 **Area & cadastre:** `grootste_monumenten_oppervlakte`, `percelen_via_spatial_join`
 
