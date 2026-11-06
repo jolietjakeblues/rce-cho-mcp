@@ -113,12 +113,15 @@ SEMANTIC_TOPICS = {
                     "oorspronkelijke functie, huidige functie en type in een UNION, "
                     "met omschrijving als laatste vangnet, en label elke tak met een "
                     "?bron-kolom zodat de betrouwbaarheid zichtbaar blijft:\n"
-                    "{ ?rm ceo:heeftOorspronkelijkeFunctie ?fObj . ?fObj ceo:heeftFunctieNaam ?fC . "
+                    "{ ?rm ceo:heeftOorspronkelijkeFunctie ?fObj . "
+                    "?fObj ceo:heeftFunctieNaam ?fC . "
                     "?fC skos:prefLabel ?fNaam . FILTER(lang(?fNaam)=\"nl\") "
-                    "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) BIND(\"oorspronkelijke functie\" AS ?bron) } "
+                    "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) "
+                    "BIND(\"oorspronkelijke functie\" AS ?bron) } "
                     "UNION { ?rm ceo:heeftHuidigeFunctie ?fObj . ?fObj ceo:heeftFunctieNaam ?fC . "
                     "?fC skos:prefLabel ?fNaam . FILTER(lang(?fNaam)=\"nl\") "
-                    "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) BIND(\"huidige functie\" AS ?bron) } "
+                    "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) "
+                    "BIND(\"huidige functie\" AS ?bron) } "
                     "UNION { ?rm ceo:heeftType ?typeObj . ?typeObj ceo:heeftTypeNaam ?typeC . "
                     "?typeC skos:prefLabel ?fNaam . FILTER(lang(?fNaam)=\"nl\") "
                     "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) BIND(\"type\" AS ?bron) } "
@@ -573,7 +576,8 @@ SEMANTIC_TOPICS = {
                 ],
                 "guidance": (
                     "Polygonen van beschermde stads- en dorpsgezichten staan in de graph "
-                    "'gezicht-hvdl' (URI: https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl). "
+                    "'gezicht-hvdl' "
+                    "(URI: https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl). "
                     "Gebruik GRAPH <https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl> "
                     "om polygonen op te halen. Het WKT-formaat is een POLYGON in WGS84. "
                     "Ruimtelijke joins (welke monumenten liggen binnen een stadsgezicht-polygoon) "
@@ -581,7 +585,10 @@ SEMANTIC_TOPICS = {
                 ),
             },
             {
-                "name": "Oppervlakte berekenen (geof:area) -- gebruik liever grootste_monumenten_oppervlakte()",
+                "name": (
+                    "Oppervlakte berekenen (geof:area) -- gebruik liever "
+                    "grootste_monumenten_oppervlakte()"
+                ),
                 "path": [
                     "ceo:heeftGeometrie",
                     "geo:asWKT",
@@ -846,7 +853,8 @@ SEMANTIC_TOPICS = {
                     "van orde van grootte, niet als exacte huidige waarde): "
                     "ceo:Rijksmonument bevatObject ceo:ArcheologischTerrein (1.812); "
                     "ceo:ArcheologischTerrein bevatObject ceo:ArcheologischComplex (18.548); "
-                    "ceo:ArcheologischOnderzoeksgebied bevatObject ceo:ArcheologischComplex (9.528); "
+                    "ceo:ArcheologischOnderzoeksgebied bevatObject "
+                    "ceo:ArcheologischComplex (9.528); "
                     "ceo:ArcheologischOnderzoeksgebied bevatObject ceo:Vondstlocatie (40.401); "
                     "ceo:Vondstlocatie bevatObject ceo:ArcheologischComplex (332.352); "
                     "ceo:Vondstlocatie bevatObject ceo:Grondsporen (93.007); "

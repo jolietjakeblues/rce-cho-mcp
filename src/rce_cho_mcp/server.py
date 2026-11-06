@@ -4,13 +4,13 @@ from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 
 from rce_cho_mcp.area import format_largest_by_area, largest_by_area
-from rce_cho_mcp.brk_spatial import _MAX_CANDIDATE_ROWS
-from rce_cho_mcp.brk_spatial import format_percelen_via_spatial_join
+from rce_cho_mcp.brk_spatial import _MAX_CANDIDATE_ROWS, format_percelen_via_spatial_join
 from rce_cho_mcp.brk_spatial import percelen_via_spatial_join as _percelen_via_spatial_join
+from rce_cho_mcp.config import MASS_SPARQL_ENDPOINT
 from rce_cho_mcp.gemeente import format_monumenten_in_gemeente
 from rce_cho_mcp.gemeente import monumenten_in_gemeente as _monumenten_in_gemeente
 from rce_cho_mcp.gemeente import resolve_gemeente as _resolve_gemeente
-from rce_cho_mcp.config import MASS_SPARQL_ENDPOINT
+from rce_cho_mcp.graphs import format_graphs
 from rce_cho_mcp.limits import LIST_MAX_LIMIT
 from rce_cho_mcp.ontology.api import (
     describe_class,
@@ -30,9 +30,6 @@ from rce_cho_mcp.sparql import (
     sparql_text_errors,
     to_geojson,
 )
-from rce_cho_mcp.graphs import format_graphs
-from rce_cho_mcp.termennetwerk import lookup_terms, search_terms
-from rce_cho_mcp.validator import format_validation_report, validate_sparql
 from rce_cho_mcp.stats import (
     class_partitions,
     dataset_totals,
@@ -45,7 +42,8 @@ from rce_cho_mcp.stats import (
     format_totals,
     property_partitions,
 )
-
+from rce_cho_mcp.termennetwerk import lookup_terms, search_terms
+from rce_cho_mcp.validator import format_validation_report, validate_sparql
 
 mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
 
@@ -387,10 +385,14 @@ def zoek_concept_termennetwerk(
             broader = t.get("broader") or []
             narrower = t.get("narrower") or []
             if broader:
-                labels = ", ".join(b["prefLabel"][0] if b.get("prefLabel") else b["uri"] for b in broader)
+                labels = ", ".join(
+                    b["prefLabel"][0] if b.get("prefLabel") else b["uri"] for b in broader
+                )
                 lines.append(f"  broader: {labels}")
             if narrower:
-                labels = ", ".join(n["prefLabel"][0] if n.get("prefLabel") else n["uri"] for n in narrower)
+                labels = ", ".join(
+                    n["prefLabel"][0] if n.get("prefLabel") else n["uri"] for n in narrower
+                )
                 lines.append(f"  narrower: {labels}")
 
     return "\n".join(lines)

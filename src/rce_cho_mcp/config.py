@@ -2,7 +2,6 @@ import os
 
 from rce_cho_mcp.graphs import KNOWN_GRAPH_ROWS, NON_QUERYABLE_GRAPH_KEYS
 
-
 # "Virtuoso" endpoint. Live getest (2026-10-30): mist de GeoSPARQL-functie
 # geof:area() (HTTP 400 "Unknown function ...geosparql/area()") -- dus NIET
 # het endpoint waar de geof:area()/geof:sfIntersects()-aanroepen in area.py/

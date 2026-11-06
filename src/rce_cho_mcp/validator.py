@@ -7,7 +7,6 @@ from rce_cho_mcp.pitfalls import (
     TWO_STAGE_SUBQUERY_REMEDY,
 )
 
-
 FORBIDDEN_PREFIXES = [
     "ceosp:",
     "ceox:",
@@ -283,7 +282,9 @@ def _find_groupby_overflow_risk(query: str) -> list[str]:
 
     warnings = []
     for var in risky_vars:
-        groupby_pattern = re.compile(rf"GROUP\s+BY\b.*\?{re.escape(var)}\b", re.IGNORECASE | re.DOTALL)
+        groupby_pattern = re.compile(
+            rf"GROUP\s+BY\b.*\?{re.escape(var)}\b", re.IGNORECASE | re.DOTALL
+        )
         if groupby_pattern.search(query):
             warnings.append(
                 f"?{var} is gebonden via een omschrijving- of naampad en staat in GROUP BY. "

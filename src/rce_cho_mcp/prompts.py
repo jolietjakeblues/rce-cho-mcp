@@ -49,7 +49,8 @@ Workflow:
 3. Voor woorden als begraafplaats, kerkhof, kerk, boerderij, molen, school:
    behandel dit als functievraag en gebruik semantics_describe_topic("functions").
    Gebruik hiervoor niet ontology_search() en niet resolve_concept_label(..., graph_name="owms").
-4. Gebruik resolve_concept_label() alleen voor labels die als SKOS-concept in een bekende named graph gezocht moeten worden.
+4. Gebruik resolve_concept_label() alleen voor labels die als SKOS-concept in
+   een bekende named graph gezocht moeten worden.
    Gebruik graph_name="owms" alleen voor gemeenten en provincies.
 4b. Ken je de exacte schrijfwijze van een CHT- of ABR-term niet, of wil je synoniemen
     en verwante termen vinden (bv. "kerk" -> narrower "kapel")? Gebruik dan eerst
@@ -72,8 +73,10 @@ Workflow:
 7. Stel pas daarna een SPARQL-query op.
 8. Gebruik validate_query() of validate_query_structured() om bekende valkuilen
    te controleren.
-9. Gebruik resolve_concept_label(graph_name="owms") alleen voor gemeenten, provincies en overheidstermen.
-10. Gebruik voor functies, juridische status en monumentaard de dataset-semantiek en query op skos:prefLabel via het juiste CEO-pad.
+9. Gebruik resolve_concept_label(graph_name="owms") alleen voor gemeenten,
+   provincies en overheidstermen.
+10. Gebruik voor functies, juridische status en monumentaard de
+    dataset-semantiek en query op skos:prefLabel via het juiste CEO-pad.
 11. Gebruik query_sparql() om de query uit te voeren.
 12. Geef het antwoord in begrijpelijk Nederlands.
 
@@ -152,7 +155,8 @@ Ontwerpregels:
   xsd:integer. Gebruik altijd aanhalingstekens (ceo:huisnummer "19"), nooit
   een kaal getal (ceo:huisnummer 19) -- dat matcht stil niets.
 """
-    + f"- Combineer ORDER BY nooit met OPTIONAL-joins in dezelfde query: {TWO_STAGE_SUBQUERY_REMEDY}\n"
+    + "- Combineer ORDER BY nooit met OPTIONAL-joins in dezelfde query: "
+    + f"{TWO_STAGE_SUBQUERY_REMEDY}\n"
     + f"- {CARTESIAN_PRODUCT_WARNING}\n"
     + """
 - De brondata kan dezelfde triple meerdere keren bevatten (bevestigd: 116x

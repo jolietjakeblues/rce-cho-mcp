@@ -1,8 +1,8 @@
-from reference_client.builder.builder import build_sparql
-from reference_client.planner.parser import parse_question
 from rce_cho_mcp.resolver import resolve_label
 from rce_cho_mcp.sparql import execute_sparql, format_results
 from rce_cho_mcp.validator import validate_sparql
+from reference_client.builder.builder import build_sparql
+from reference_client.planner.parser import parse_question
 
 
 def answer_question(question: str, max_rows: int = 100) -> str:

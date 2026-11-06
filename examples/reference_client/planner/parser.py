@@ -1,5 +1,7 @@
-from reference_client.planner.models import QueryPlan
 import re
+
+from reference_client.planner.models import QueryPlan
+
 
 def parse_question(question: str) -> QueryPlan:
     """Parse a simple Dutch heritage question into a QueryPlan."""
@@ -18,7 +20,9 @@ def parse_question(question: str) -> QueryPlan:
 
     filters = {}
 
-    provincie_match = re.search(r"\bprovincie\s+([A-Za-zÀ-ÿ' -]+)\??$", question.strip(), re.IGNORECASE)
+    provincie_match = re.search(
+        r"\bprovincie\s+([A-Za-zÀ-ÿ' -]+)\??$", question.strip(), re.IGNORECASE
+    )
     if provincie_match:
         provincie = provincie_match.group(1).strip()
         filters["provincie"] = provincie

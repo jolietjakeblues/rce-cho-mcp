@@ -3,8 +3,8 @@
 from rce_cho_mcp.area import _MONUMENT_AARD_URIS as area_aard_uris
 from rce_cho_mcp.area import _clamp_limit as area_clamp_limit
 from rce_cho_mcp.gemeente import _MONUMENT_AARD_URIS as gemeente_aard_uris
-from rce_cho_mcp.gemeente import _normalize_gemeente_naam
 from rce_cho_mcp.gemeente import _clamp_limit as gemeente_clamp_limit
+from rce_cho_mcp.gemeente import _normalize_gemeente_naam
 from rce_cho_mcp.limits import LIST_MAX_LIMIT
 
 

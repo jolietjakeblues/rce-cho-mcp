@@ -302,7 +302,8 @@ def format_percelen_via_spatial_join(result: dict) -> str:
             else "(alleen het ene perceel waar dit punt in valt, geen volledige dekking)"
         ),
         f"Gemeente(n) doorzocht: {', '.join(result['gemeente(s)'])}",
-        f"Aantal overlappende percelen (spatial join, geof:sfIntersects): {result['aantal_percelen']}",
+        f"Aantal overlappende percelen (spatial join, geof:sfIntersects): "
+        f"{result['aantal_percelen']}",
         f"Totale kadastrale oppervlakte: {result['totale_kadastrale_oppervlakte_m2']:,.0f} m2",
     ]
 
