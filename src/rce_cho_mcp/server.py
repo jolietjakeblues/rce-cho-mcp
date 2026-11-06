@@ -270,33 +270,55 @@ def monumenten_in_gemeente(
     monument_aard: str | None = None,
     limit: Annotated[int, Field(ge=1, le=LIST_MAX_LIMIT)] = 50,
 ) -> str:
-    """Tel en toon monumenten in een gemeente, met automatische
-    gemeente-resolutie, de juiste graph en een standaard
-    juridische-statusfilter -- combineert in één aanroep wat anders drie
-    losse, foutgevoelige stappen zijn (resolve_concept_label op owms,
-    GRAPH instanties-rce onthouden, handmatig heeftJuridischeStatus
+    """Tel en toon objecten in een gemeente, met automatische
+    gemeente-resolutie, de juiste graph en (voor Rijksmonument) een
+    standaard juridische-statusfilter -- combineert in één aanroep wat
+    anders drie losse, foutgevoelige stappen zijn (resolve_concept_label op
+    owms, GRAPH instanties-rce onthouden, handmatig heeftJuridischeStatus
     toevoegen).
+
+    RDFS-gezien is de gemeentekoppeling via
+    ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente niet Rijksmonument-
+    specifiek, maar in de PRAKTIJK is hij alleen betrouwbaar gevuld bij
+    class_name "Rijksmonument" (~100%), "ArcheologischOnderzoeksgebied"
+    (~91%) en "Vondstlocatie" (~91%) -- geverifieerd 2026-11-06. Gebruik
+    dit pad voor archeologische onderzoeksgebieden -- ga NIET uit van het
+    Rijksmonument-only ceo:gemeentenaam-tekstveld (domain ceo:BRKRelatie,
+    onbetrouwbaar en niet aanwezig op andere classes) of van een BAG-
+    woonplaatsnaam als gemeentefilter. Bij "ArcheologischComplex",
+    "ArcheologischTerrein", "Grondsporen", "Vondsten", "Complex" en
+    "Gezicht" is deze koppeling vrijwel altijd leeg -- het resultaat bevat
+    dan een "WAARSCHUWING"-regel met een alternatief (meestal: filter op de
+    bovenliggende class via ceo:ligtInObject/ceo:bevatObject, zie
+    semantics_describe_topic('archaeology')).
 
     gemeente: gemeentenaam (bv. "Utrecht", "'s-Hertogenbosch"). Wordt
     automatisch gedisambigueerd tegen gelijknamige provincies/kadastrale
     gemeenten (zie resolve_gemeente()) en opgelost naar de concept-URI.
     juridische_status: "rijksmonument" (standaard, actief beschermd),
     "voorbeschermd", "geen rijksmonument", of "alle" om niet op status te
-    filteren. Zie semantics_describe_topic('legal_status').
-    class_name: CEO-class (standaard "Rijksmonument"; ook bv.
-    "ArcheologischTerrein", "Complex", "Gezicht" -- gebruik ontology_search()
-    om classnamen te vinden).
+    filteren. Zie semantics_describe_topic('legal_status'). BELANGRIJK: dit
+    filter bestaat in de ontologie alleen op ceo:Rijksmonument (rdfs:domain)
+    -- bij elke andere class_name (bv. "ArcheologischOnderzoeksgebied")
+    geef je hier expliciet "alle" mee, anders krijg je een foutmelding in
+    plaats van (voorheen) stil 0 resultaten.
+    class_name: CEO-class (standaard "Rijksmonument"; betrouwbaar gevuld
+    bij ook "ArcheologischOnderzoeksgebied" en "Vondstlocatie" -- gebruik
+    ontology_search() om andere classnamen te vinden, en lees de
+    WAARSCHUWING in het resultaat bij een minder courante class).
     monument_aard: optioneel, "archeologisch" of "onroerend gebouwd" (zie
-    semantics_describe_topic('monument_aard')) om binnen class_name verder
-    te filteren op ceo:heeftMonumentAard.
+    semantics_describe_topic('monument_aard')) om binnen class_name="Rijksmonument"
+    verder te filteren op ceo:heeftMonumentAard. Net als juridische_status
+    bestaat dit alleen op Rijksmonument -- laat dit weg bij een andere
+    class_name.
     limit: hoeveel rijen getoond worden in de steekproef (1-200); "Aantal"
     in het resultaat geldt voor de volledige gevonden set, niet alleen deze
     steekproef.
 
-    Let op: dit filtert op de gemeente die RCE zelf aan het monument
-    koppelt (ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente) -- als die
-    koppeling ontbreekt of een monument over een gemeentegrens heen ligt die
-    RCE niet toont, mist deze tool dat monument (zelfde beperking als
+    Let op: dit filtert op de gemeente die RCE zelf aan het object koppelt
+    (ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente) -- als die
+    koppeling ontbreekt of een object over een gemeentegrens heen ligt die
+    RCE niet toont, mist deze tool dat object (zelfde beperking als
     percelen_via_spatial_join()).
     """
     return format_monumenten_in_gemeente(
