@@ -110,7 +110,7 @@ De connector houdt geen afzonderlijke lokale kopie van de volledige brondata bij
 
 ## 8. De tools van de RCE CHO-connector 
 
-De RCE CHO-connector biedt op dit moment 30 acties aan. De NL-GOV- en Kadaster-connectors hebben een vergelijkbare set, toegespitst op hun eigen bronnen. Elke tool vormt een vaste bouwsteen voor een specifieke taak. De tools van de RCE CHO-connector vallen in vijf groepen uiteen. 
+De RCE CHO-connector biedt op dit moment 31 acties aan. De NL-GOV- en Kadaster-connectors hebben een vergelijkbare set, toegespitst op hun eigen bronnen. Elke tool vormt een vaste bouwsteen voor een specifieke taak. De tools van de RCE CHO-connector vallen in vijf groepen uiteen. 
 
 ### A. De data en ontologie verkennen 
 
@@ -127,6 +127,8 @@ Deze tools helpen om vast te stellen welke objecttypen, eigenschappen, relaties 
 - **Explore incoming:** onderzoekt vanuit welke klassen, en via welke relaties, er naar instanties van een klasse of resource wordt verwezen. 
 
 - **Graphs list:** toont de named graphs waarin de data is verdeeld. 
+
+- **Verwijzingen:** geeft de links naar de Linked Data Voorziening van de RCE (de website en de SPARQL-endpoints per dataset) en naar de CEO-ontologie, zodat de herkomst van een antwoord na te gaan is. 
 
 - **Dataset statistics, Class instance counts en Property usage counts:** geven tellingen van objecten, typen en gebruikte eigenschappen. 
 

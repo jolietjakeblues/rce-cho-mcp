@@ -6,6 +6,7 @@ import rce_cho_mcp.server as server
 def test_static_resources_registered():
     keys = set(server.mcp._resource_manager._resources.keys())
     assert keys == {
+        "rce-cho://verwijzingen",
         "rce-cho://graphs",
         "rce-cho://ontology/statistics",
         "rce-cho://semantics/topics",
@@ -61,3 +62,10 @@ async def test_zoek_scheepswrak_prompt_renders():
     text = messages.messages[0].content.text
     assert "Hendrika" in text
     assert "query_sparql_mass" in text
+
+
+async def test_read_verwijzingen_resource():
+    result = await server.mcp.read_resource("rce-cho://verwijzingen")
+    content = result[0].content
+    assert "https://linkeddata.cultureelerfgoed.nl/" in content
+    assert "CEO_RCE.ttl" in content

@@ -95,9 +95,32 @@ Het RCE linked data-ecosysteem bestaat uit meerdere lagen.
 
 **Dataset-graphs.** Bevatten de daadwerkelijke cultureel-erfgoeddata. Relevante triples kunnen verspreid zijn over meerdere named graphs.
 
+### Verwijzingen
+
+**Linked Data Voorziening (LDV) van de RCE**
+
+- Frontend: <https://linkeddata.cultureelerfgoed.nl/> (alle RCE-datasets, opgeslagen query's en data stories: <https://linkeddata.cultureelerfgoed.nl/rce>)
+
+| Dataset | Frontend | SPARQL-endpoint | Tool |
+|---|---|---|---|
+| CHO | <https://linkeddata.cultureelerfgoed.nl/rce/cho> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/sparql` | `query_sparql` |
+| MASS | <https://linkeddata.cultureelerfgoed.nl/rce/mass> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/mass/sparql` | `query_sparql_mass` |
+| Afbeeldingen | <https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/afbeeldingen/sparql` | `query_sparql_afbeeldingen` |
+| Bibliotheek | <https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/bibliotheek/sparql` | `query_sparql_bibliotheek` |
+
+Elke dataset heeft in de frontend een SPARQL-editor op `<frontend-URL>/sparql`. Voor CHO gebruikt de server daarnaast een fallback-endpoint: `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql`.
+
+**CEO-ontologie**
+
+- Ontologie-URI: <https://linkeddata.cultureelerfgoed.nl/def/ceo> (namespace `https://linkeddata.cultureelerfgoed.nl/def/ceo#`)
+- Bronbestand: [CEO_RCE.ttl](https://raw.githubusercontent.com/cultureelerfgoed/CEO/master/CEO_RCE.ttl) in de repository <https://github.com/cultureelerfgoed/CEO>
+- De server gebruikt een gebundelde kopie: [`src/rce_cho_mcp/ontology/CEO_RCE.ttl`](src/rce_cho_mcp/ontology/CEO_RCE.ttl)
+
+Dezelfde verwijzingen zijn in de server op te vragen met de tool `verwijzingen` of de resource `rce-cho://verwijzingen`.
+
 ### MCP-tools
 
-**Ontdekking:** `ping`, `graphs_list`, `ontology_statistics`, `ontology_search`
+**Ontdekking:** `ping`, `verwijzingen`, `graphs_list`, `ontology_statistics`, `ontology_search`
 
 **Ontologie:** `ontology_describe_class`, `ontology_describe_property`
 
@@ -147,7 +170,7 @@ Validatiechecks omvatten onder meer:
 
 **Endpoints.** Standaard gaan queries naar het "Speedy"-endpoint (standaardconform SPARQL 1.1, en het endpoint dat GeoSPARQL-functies zoals `geof:area()` daadwerkelijk ondersteunt). Als dat endpoint onbereikbaar is of een gateway-foutmelding geeft (502/503/504), probeert `execute_sparql()` automatisch één keer opnieuw tegen het "Virtuoso"-endpoint. Welk van de twee endpoints de hierboven genoemde query-eigenaardigheden (GROUP BY-overflow, ORDER BY+OPTIONAL-504, geof:sfWithin-timeout) exact geeft, is niet per-endpoint herverifieerd; de validator waarschuwt er hoe dan ook voor. Override met de omgevingsvariabelen `SPARQL_ENDPOINT` en `SPARQL_FALLBACK_ENDPOINT`.
 
-**Resources en Prompts.** Naast tools biedt de server ook MCP Resources (`rce-cho://graphs`, `rce-cho://ontology/statistics`, `rce-cho://semantics/topics`, en de template `rce-cho://semantics/{topic}`) voor clients die statische referentiedata willen browsen/aanhechten zonder een tool aan te roepen, en twee MCP Prompts (`zoek_monumenten_in_gemeente`, `zoek_scheepswrak`) als voorgesorteerde workflow-starters.
+**Resources en Prompts.** Naast tools biedt de server ook MCP Resources (`rce-cho://verwijzingen`, `rce-cho://graphs`, `rce-cho://ontology/statistics`, `rce-cho://semantics/topics`, en de template `rce-cho://semantics/{topic}`) voor clients die statische referentiedata willen browsen/aanhechten zonder een tool aan te roepen, en twee MCP Prompts (`zoek_monumenten_in_gemeente`, `zoek_scheepswrak`) als voorgesorteerde workflow-starters.
 
 ### Waarom datasetsemantiek?
 
@@ -289,9 +312,32 @@ The RCE linked data ecosystem consists of several layers.
 
 **Dataset graphs.** Contain the actual cultural heritage data. Relevant triples may be spread across multiple named graphs.
 
+### References
+
+**Linked Data Voorziening (LDV), the RCE linked data platform**
+
+- Frontend: <https://linkeddata.cultureelerfgoed.nl/> (all RCE datasets, saved queries and data stories: <https://linkeddata.cultureelerfgoed.nl/rce>)
+
+| Dataset | Frontend | SPARQL endpoint | Tool |
+|---|---|---|---|
+| CHO | <https://linkeddata.cultureelerfgoed.nl/rce/cho> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/sparql` | `query_sparql` |
+| MASS | <https://linkeddata.cultureelerfgoed.nl/rce/mass> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/mass/sparql` | `query_sparql_mass` |
+| Afbeeldingen | <https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/afbeeldingen/sparql` | `query_sparql_afbeeldingen` |
+| Bibliotheek | <https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/bibliotheek/sparql` | `query_sparql_bibliotheek` |
+
+Each dataset has a SPARQL editor in the frontend at `<frontend URL>/sparql`. For CHO the server also uses a fallback endpoint: `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql`.
+
+**CEO ontology**
+
+- Ontology URI: <https://linkeddata.cultureelerfgoed.nl/def/ceo> (namespace `https://linkeddata.cultureelerfgoed.nl/def/ceo#`)
+- Source file: [CEO_RCE.ttl](https://raw.githubusercontent.com/cultureelerfgoed/CEO/master/CEO_RCE.ttl) in the repository <https://github.com/cultureelerfgoed/CEO>
+- The server uses a bundled copy: [`src/rce_cho_mcp/ontology/CEO_RCE.ttl`](src/rce_cho_mcp/ontology/CEO_RCE.ttl)
+
+The same references are available from the server through the `verwijzingen` tool or the `rce-cho://verwijzingen` resource.
+
 ### MCP tools
 
-**Discovery:** `ping`, `graphs_list`, `ontology_statistics`, `ontology_search`
+**Discovery:** `ping`, `verwijzingen`, `graphs_list`, `ontology_statistics`, `ontology_search`
 
 **Ontology:** `ontology_describe_class`, `ontology_describe_property`
 
@@ -341,7 +387,7 @@ Validation checks include:
 
 **Endpoints.** By default, queries go to the "Speedy" endpoint (standards-compliant SPARQL 1.1, and the endpoint that actually supports GeoSPARQL functions such as `geof:area()`). If that endpoint is unreachable or returns a gateway-level error (502/503/504), `execute_sparql()` automatically retries once against the "Virtuoso" endpoint. Which of the two endpoints exactly produces the query quirks listed above (GROUP BY overflow, ORDER BY+OPTIONAL 504, geof:sfWithin timeout) has not been re-verified per endpoint; the validator warns regardless. Override with the `SPARQL_ENDPOINT` and `SPARQL_FALLBACK_ENDPOINT` environment variables.
 
-**Resources and Prompts.** Besides tools, the server also exposes MCP Resources (`rce-cho://graphs`, `rce-cho://ontology/statistics`, `rce-cho://semantics/topics`, and the template `rce-cho://semantics/{topic}`) for clients that want to browse/attach static reference data without calling a tool, and two MCP Prompts (`zoek_monumenten_in_gemeente`, `zoek_scheepswrak`) as pre-built workflow starters.
+**Resources and Prompts.** Besides tools, the server also exposes MCP Resources (`rce-cho://verwijzingen`, `rce-cho://graphs`, `rce-cho://ontology/statistics`, `rce-cho://semantics/topics`, and the template `rce-cho://semantics/{topic}`) for clients that want to browse/attach static reference data without calling a tool, and two MCP Prompts (`zoek_monumenten_in_gemeente`, `zoek_scheepswrak`) as pre-built workflow starters.
 
 ### Why dataset semantics?
 

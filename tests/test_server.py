@@ -9,7 +9,7 @@ import pytest
 
 import rce_cho_mcp.server as server
 
-EXPECTED_TOOL_COUNT = 30
+EXPECTED_TOOL_COUNT = 31
 
 
 def _tools():
@@ -79,3 +79,7 @@ def test_monumenten_in_gemeente_counts_predecessors_by_default():
 
 def test_query_sparql_description_mentions_formeel_standpunt():
     assert "formeelStandpunt true" in _tools()["query_sparql"].description
+
+
+def test_verwijzingen_tool_is_registered():
+    assert "verwijzingen" in _tools()
