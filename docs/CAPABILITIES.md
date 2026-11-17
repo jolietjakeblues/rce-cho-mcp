@@ -245,6 +245,43 @@ Huidige tools:
 Raadpleeg `semantics_describe_topic('maritime')` voor de querypaden voordat
 je zelf een pad verzint, net als bij het CHO-endpoint.
 
+### 5e. Afbeeldingen en Bibliotheek (aparte RCE-datasets)
+
+Twee aparte datasets met een eigen endpoint en schema.org-vocabulaire (`sdo:`) -- geen
+CEO-objecten, geen CHO-endpoint.
+
+Huidige tools:
+
+- `query_sparql_afbeeldingen` — Beeldbank RCE (`https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen`,
+  graph `.../graphs/photos`): foto's en tekeningen met beeld-URL, maker, datum, plaats,
+  licentie en koppeling naar rijksmonumenten via `sdo:about`
+- `query_sparql_bibliotheek` — bibliotheekcatalogus RCE (`https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek`,
+  graphs `.../graphs/books` en `.../graphs/article`): boeken en tijdschriftartikelen met
+  onderwerpen (CHT/ABR), plaatsen en rijksmonumentnummers
+
+Raadpleeg `semantics_describe_topic('images')` resp. `semantics_describe_topic('library')`
+voor de querypaden. `graphs_list` toont deze graphs in een aparte sectie, omdat ze niet op
+het CHO-endpoint bestaan.
+
+### 5f. Vaste interpretatieregels (afgestemd met RCE, 2026-11-17)
+
+- **Formeel standpunt.** Kennisregistraties (omschrijving, type, gebeurtenis, stijl en
+  cultuur, materiaal, ...) dragen `ceo:formeelStandpunt` true/false. Standaard wordt alleen
+  kennis met `true` getoond; `false` alleen op uitdrukkelijk verzoek en met vermelding.
+  Uitzondering: bij de archeologische classes (ArcheologischOnderzoeksgebied, Vondstlocatie,
+  Vondsten, Grondsporen, ArcheologischTerrein, ArcheologischComplex) heeft de boolean geen
+  betekenis; daar wordt niet gefilterd en wordt kennis zonder vermelding getoond.
+  Zie `semantics_describe_topic('formeel_standpunt')`.
+- **Archis2-nummers.** Worden al jaren niet meer uitgegeven en bestaan alleen op
+  registraties uit het Archis2-tijdperk (conversie: registratiedatum 2015/2016). Bruikbaar
+  om een bestaand oud nummer op te zoeken, niet om volledige selecties of tellingen te maken.
+  Zie `semantics_describe_topic('archaeology')`.
+- **Gemeentelijke herindelingen.** `ceo:heeftGemeente` (OWMS) is bij herindelingen niet
+  volledig omgezet. `monumenten_in_gemeente` telt opgeheven voorgangers mee
+  (`inclusief_voorgangers`), `resolve_gemeente` meldt einddatum, opvolger en voorgangers,
+  en `percelen_via_spatial_join` vertaalt een opgeheven gemeente naar de huidige. Zie
+  `semantics_describe_topic('gemeenten')`.
+
 ### 5b. Conceptzoeken (NDE Termennetwerk)
 
 Zoekt SKOS-concepten op natuurlijke taal, met synoniemen en verwante termen,
@@ -298,6 +335,7 @@ Voorbeelden van controles:
 - meerdere onafhankelijke multi-valued `OPTIONAL`-blokken in dezelfde query (cartesisch product)
 - `ceo:huisnummer` / `ceo:perceelnummer` met een kaal getal-literal i.p.v. een gequote string (stille nul-resultaten)
 - een rijksmonument-/complex-/gezicht-/werelderfgoednummer dat via `CONCAT()` direct in een CHO-URI-pad wordt geplakt (dat padsegment is het interne `cultuurhistorischObjectnummer`, niet dat nummer -- de fout geeft geen foutmelding, alleen het verkeerde monument)
+- een kennispad met gemengde `ceo:formeelStandpunt`-waarden (`ceo:heeftOmschrijving`, `ceo:heeftType`, `ceo:heeftGebeurtenis`, `ceo:heeftStijlEnCultuur`, `ceo:heeftMateriaal`, `ceo:heeftKennisregistratie`) zonder `ceo:formeelStandpunt`
 
 ### 7. Execution
 
@@ -309,6 +347,7 @@ Huidige tools:
 - `query_sparql_json`
 - `query_sparql_geojson`
 - `query_sparql_mass` (apart MASS-endpoint, zie capabilitygroep 5d)
+- `query_sparql_afbeeldingen` en `query_sparql_bibliotheek` (aparte endpoints, zie capabilitygroep 5e)
 - `convert_rd_to_wgs84`
 
 `query_sparql` geeft leesbare tekst terug.

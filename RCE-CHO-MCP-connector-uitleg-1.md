@@ -110,7 +110,7 @@ De connector houdt geen afzonderlijke lokale kopie van de volledige brondata bij
 
 ## 8. De tools van de RCE CHO-connector 
 
-De RCE CHO-connector biedt op dit moment 28 acties aan. De NL-GOV- en Kadaster-connectors hebben een vergelijkbare set, toegespitst op hun eigen bronnen. Elke tool vormt een vaste bouwsteen voor een specifieke taak. De tools van de RCE CHO-connector vallen in vijf groepen uiteen. 
+De RCE CHO-connector biedt op dit moment 30 acties aan. De NL-GOV- en Kadaster-connectors hebben een vergelijkbare set, toegespitst op hun eigen bronnen. Elke tool vormt een vaste bouwsteen voor een specifieke taak. De tools van de RCE CHO-connector vallen in vijf groepen uiteen. 
 
 ### A. De data en ontologie verkennen 
 
@@ -144,6 +144,10 @@ Deze tools voeren zoekopdrachten uit op de beschikbare databank.
 
 - **Query sparql mass:** bevraagt een apart gegevensbestand over maritiem erfgoed (scheepswrakken), met een eigen vraagtaalstructuur die niet samenvalt met de reguliere RCE CHO-gegevens. 
 
+- **Query sparql afbeeldingen:** bevraagt het aparte gegevensbestand van de Beeldbank van de RCE (foto's, bouwtekeningen en prenten), inclusief maker, datum, licentie en de koppeling met rijksmonumenten. 
+
+- **Query sparql bibliotheek:** bevraagt de aparte bibliotheekcatalogus van de RCE (boeken en tijdschriftartikelen), met onderwerpen, plaatsen en verwijzingen naar rijksmonumenten. 
+
 ### C. Begrippen herkennen en vertalen 
 
 Deze tools ondersteunen de koppeling tussen woorden van gebruikers, officiële begrippen en URI's. Dat is nodig wanneer registraties verschillende labels, afkortingen of identificaties gebruiken. 
@@ -168,9 +172,9 @@ Deze tools verkleinen de kans op zoekvragen die technisch geldig lijken, maar do
 
 Deze tools bundelen een veelgevraagde combinatie van stappen (een gemeente eenduidig herkennen, de juiste gegevensverzameling kiezen, een gangbare filtering toepassen) tot één betrouwbare aanroep, zodat die niet telkens apart en foutgevoelig hoeft te worden opgebouwd. 
 
-- **Resolve gemeente:** herkent een gemeentenaam eenduidig, ook wanneer een gelijknamige provincie of historische gemeente voor verwarring zou kunnen zorgen. 
+- **Resolve gemeente:** herkent een gemeentenaam eenduidig, ook wanneer een gelijknamige provincie of historische gemeente voor verwarring zou kunnen zorgen. Meldt daarbij of een gemeente door een herindeling is opgeheven, in welke gemeente zij is opgegaan en welke voorgangers een gemeente heeft. 
 
-- **Monumenten in gemeente:** telt en toont rijksmonumenten in een gekozen gemeente, inclusief de juridische status. Werkt ook voor archeologische objecten binnen die gemeente, zoals archeologische onderzoeksgebieden en vondstlocaties. 
+- **Monumenten in gemeente:** telt en toont rijksmonumenten in een gekozen gemeente, inclusief de juridische status. Werkt ook voor archeologische objecten binnen die gemeente, zoals archeologische onderzoeksgebieden en vondstlocaties. Omdat de gemeentekoppeling in de brondata bij herindelingen niet volledig is bijgewerkt, telt deze tool de opgeheven voorgangers van een gemeente standaard mee en toont de uitsplitsing. 
 
 - **Grootste monumenten oppervlakte:** berekent en rangschikt monumenten op oppervlakte, rechtstreeks vanuit de beschikbare geometrie. 
 

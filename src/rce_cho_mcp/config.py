@@ -60,7 +60,7 @@ for _row in KNOWN_GRAPH_ROWS:
 
 del _row
 
-USER_AGENT = "rce-cho-mcp/0.5.0b1"
+USER_AGENT = "rce-cho-mcp/0.6.0b1"
 
 # Kadaster Kennisgraph (KKG) SPARQL-endpoint, gebruikt door brk_spatial.py voor
 # de spatial join tussen RCE-monumentgeometrie en Kadaster-percelen. Zelfde
@@ -81,6 +81,27 @@ KKG_SPARQL_ENDPOINT = os.getenv(
 MASS_SPARQL_ENDPOINT = os.getenv(
     "MASS_SPARQL_ENDPOINT",
     "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/mass/sparql",
+)
+
+# RCE Afbeeldingen (Beeldbank): aparte dataset/endpoint met foto's,
+# bouwtekeningen en prenten in schema.org-vocabulaire (sdo:Photograph /
+# ImageObject), gekoppeld aan rijksmonumenten via sdo:about. Zie
+# semantics_describe_topic('images'). Live getest (2026-11-17): de hoofddata
+# staat in de named graph .../rce/afbeeldingen/graphs/photos (~18,9 miljoen
+# triples, 565.170 foto's).
+AFBEELDINGEN_SPARQL_ENDPOINT = os.getenv(
+    "AFBEELDINGEN_SPARQL_ENDPOINT",
+    "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/afbeeldingen/sparql",
+)
+
+# RCE Bibliotheek: aparte dataset/endpoint met de bibliotheekcatalogus
+# (boeken en tijdschriftartikelen) in schema.org-vocabulaire. Zie
+# semantics_describe_topic('library'). Live getest (2026-11-17): named graphs
+# .../rce/bibliotheek/graphs/books (155.422 boeken) en .../graphs/article
+# (26.265 artikelen).
+BIBLIOTHEEK_SPARQL_ENDPOINT = os.getenv(
+    "BIBLIOTHEEK_SPARQL_ENDPOINT",
+    "https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/bibliotheek/sparql",
 )
 
 # Public, unauthenticated GraphQL API of the NDE Network of Terms

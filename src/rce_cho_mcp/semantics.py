@@ -7,6 +7,21 @@ MONUMENT_AARD_WARNING = (
     "ook al lijkt 'aard' semantisch op 'soort'."
 )
 
+# Classes waarvoor ceo:formeelStandpunt GEEN betekenis heeft (bevestigd door
+# RCE, 2026-11-17): de boolean staat er in de data wel op (vrijwel altijd
+# false), maar zegt bij archeologie niets. Kennis op deze classes wordt dus
+# gewoon getoond, zonder filter en zonder "geen formeel standpunt"-vermelding.
+# Eén bron: ook gebruikt door validator.py om de formeel-standpuntwaarschuwing
+# bij archeologiequery's te onderdrukken.
+FORMEEL_STANDPUNT_EXEMPT_CLASSES = (
+    "ArcheologischOnderzoeksgebied",
+    "Vondstlocatie",
+    "Vondsten",
+    "Grondsporen",
+    "ArcheologischTerrein",
+    "ArcheologischComplex",
+)
+
 FUNCTION_PATH_NOTE = (
     "Gebruik voor type-/categorievragen (vliegveld, fort, begraafplaats, "
     "landgoed, fabriek, industrieterrein, ...) in plaats daarvan "
@@ -96,7 +111,15 @@ SEMANTIC_TOPICS = {
                     "gebeurtenisNaam, bouwkundigeStaat en datering bundelt -- niet "
                     "hetzelfde als, en niet hetzelfde aantal triples als, de "
                     "ceo:Type-node van heeftType. heeftType is en blijft het directe, "
-                    "kortere pad specifiek voor type-/objectsoortvragen."
+                    "kortere pad specifiek voor type-/objectsoortvragen. LET OP "
+                    "formeel standpunt: van de 907.615 ceo:Type-nodes hebben er "
+                    "slechts 29.569 ceo:formeelStandpunt true (geverifieerd "
+                    "2026-11-17); de rest (878.046, vrijwel alles buiten "
+                    "Rijksmonument) is false. Voeg bij rijksmonumenten, "
+                    "complexen en gezichten standaard ?typeObj "
+                    "ceo:formeelStandpunt true toe; bij de archeologische classes "
+                    "heeft de boolean geen betekenis en filter je er NIET op -- "
+                    "zie semantics_describe_topic('formeel_standpunt')."
                 ),
             },
             {
@@ -122,10 +145,12 @@ SEMANTIC_TOPICS = {
                     "?fC skos:prefLabel ?fNaam . FILTER(lang(?fNaam)=\"nl\") "
                     "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) "
                     "BIND(\"huidige functie\" AS ?bron) } "
-                    "UNION { ?rm ceo:heeftType ?typeObj . ?typeObj ceo:heeftTypeNaam ?typeC . "
+                    "UNION { ?rm ceo:heeftType ?typeObj . ?typeObj ceo:formeelStandpunt true ; "
+                    "ceo:heeftTypeNaam ?typeC . "
                     "?typeC skos:prefLabel ?fNaam . FILTER(lang(?fNaam)=\"nl\") "
                     "FILTER(CONTAINS(LCASE(?fNaam), \"kerk\")) BIND(\"type\" AS ?bron) } "
-                    "UNION { ?rm ceo:heeftOmschrijving ?oObj . ?oObj ceo:omschrijving ?fNaam . "
+                    "UNION { ?rm ceo:heeftOmschrijving ?oObj . ?oObj ceo:formeelStandpunt true ; "
+                    "ceo:omschrijving ?fNaam . "
                     "FILTER(REGEX(LCASE(?fNaam), \"(^|\\\\W)kerk(\\\\W|$)\")) "
                     "BIND(\"omschrijving (onzeker)\" AS ?bron) }.\n"
                     "Selecteer ?bron altijd mee in SELECT DISTINCT. Rijen met "
@@ -339,7 +364,18 @@ SEMANTIC_TOPICS = {
                 ],
                 "guidance": (
                     "Gebruik dit pad voor beschrijvende tekst. Filter hier alleen "
-                    "op als er geen beter conceptueel pad bestaat."
+                    "op als er geen beter conceptueel pad bestaat. Een "
+                    "ceo:Omschrijving is een kennisregistratie met "
+                    "ceo:formeelStandpunt true of false (87.061 true, 464.541 "
+                    "false, geverifieerd 2026-11-17). Toon bij rijksmonumenten, "
+                    "complexen en gezichten standaard alleen het formele "
+                    "standpunt (bij de archeologische classes heeft de boolean "
+                    "geen betekenis: daar niet filteren): "
+                    "?cho ceo:heeftOmschrijving ?oObj . ?oObj "
+                    "ceo:formeelStandpunt true ; ceo:omschrijving ?tekst . Bij "
+                    "Rijksmonument is dat de officiele registeromschrijving "
+                    "(67.415 true naast 4.859 false). Zie "
+                    "semantics_describe_topic('formeel_standpunt')."
                 ),
             },
         ],
@@ -575,11 +611,26 @@ SEMANTIC_TOPICS = {
                     "geo:asWKT",
                 ],
                 "guidance": (
-                    "Polygonen van beschermde stads- en dorpsgezichten staan in de graph "
-                    "'gezicht-hvdl' "
-                    "(URI: https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl). "
-                    "Gebruik GRAPH <https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl> "
-                    "om polygonen op te halen. Het WKT-formaat is een POLYGON in WGS84. "
+                    "Polygonen van beschermde stads- en dorpsgezichten (ceo:Gezicht) "
+                    "staan in de graph 'instanties-rce' via ceo:heeftGeometrie -> "
+                    "geo:asWKT (WGS84; live geverifieerd 2026-11-17: 472 gezichten "
+                    "met geo:asWKT, allemaal in instanties-rce). CORRECTIE op een "
+                    "eerdere versie van deze tekst: de graph 'gezicht-hvdl' "
+                    "(https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl) bevat "
+                    "GEEN geo:asWKT -- een GRAPH-restrictie daarop geeft voor de "
+                    "polygoon stil 0 resultaten. Die graph bevat wel aanvullende "
+                    "gegevens per gezicht (482 stuks): op het Gezicht zelf "
+                    "ceo:inProceduredatumGezicht, ceo:intrekkingsdatumGezicht (9x, "
+                    "ingetrokken gezichten) en ceo:wordtGetoondOp; op de Geometrie-"
+                    "node ceo:oppervlakteInHectare, ceo:oppervlakteInVierkanteKilometers, "
+                    "ceo:begrenzingsdatumGezicht, ceo:heeftOndergrondGezicht en een "
+                    "ceo:asWKT-RD-PUNT in Rijksdriehoekscoordinaten. Hetzelfde geldt "
+                    "voor 'werelderfgoed-hvdl' (18 werelderfgoederen: "
+                    "ceo:jaarVanInschrijving, ceo:heeftWerelderfgoedType, "
+                    "ceo:wordtGetoondOp naar whc.unesco.org, en oppervlakte op de "
+                    "Geometrie-node). Combineer beide dus zo: polygoon uit "
+                    "instanties-rce, oppervlakte/datums uit de hvdl-graph, gejoined op "
+                    "de gezicht-/werelderfgoed-URI. "
                     "Ruimtelijke joins (welke monumenten liggen binnen een stadsgezicht-polygoon) "
                     "moeten lokaal worden uitgevoerd met Shapely; gebruik geof:sfWithin niet."
                 ),
@@ -836,7 +887,19 @@ SEMANTIC_TOPICS = {
             "Gebruik dit topic voor vragen over archeologische terreinen, "
             "onderzoeksgebieden, complexen, vondstlocaties, grondsporen en "
             "vondsten. Dit zijn aparte classes naast ceo:Rijksmonument, "
-            "onderling verbonden via ceo:bevatObject / ceo:ligtInObject."
+            "onderling verbonden via ceo:bevatObject / ceo:ligtInObject.\n"
+            "LET OP 1 (formeel standpunt): voor ArcheologischOnderzoeksgebied, "
+            "Vondstlocatie, Vondsten, Grondsporen, ArcheologischTerrein en "
+            "ArcheologischComplex heeft ceo:formeelStandpunt GEEN betekenis "
+            "(bevestigd door RCE, 2026-11-17). De boolean staat in de data "
+            "vrijwel altijd op false, maar zegt hier niets: filter er NIET op "
+            "en toon omschrijving, type, datering, cultuur en materiaal gewoon, "
+            "zonder vermelding. De regel 'alleen formeel standpunt' geldt wel "
+            "voor rijksmonumenten, ook archeologische; zie "
+            "semantics_describe_topic('formeel_standpunt').\n"
+            "LET OP 2 (Archis2): Archis2-nummers worden al jaren niet meer "
+            "uitgegeven en dekken alleen de periode tot de conversie -- zie het "
+            "patroon 'Archis2-identificatienummers' hieronder."
         ),
         "patterns": [
             {
@@ -870,9 +933,36 @@ SEMANTIC_TOPICS = {
                 ),
             },
             {
-                "name": "Archis2-identificatienummers",
+                "name": "Archis2-identificatienummers (historisch, niet meer uitgegeven)",
                 "path": ["ceo:archis2Monumentnummer"],
                 "guidance": (
+                    "BELANGRIJK, PERIODE: Archis2-nummers (waaronder het "
+                    "ceo:archis2Vondstmeldingsnummer) worden al jaren niet meer "
+                    "uitgegeven (bevestigd door RCE, 2026-11-17). Ze bestaan alleen "
+                    "op registraties uit het Archis2-tijdperk, dus op wat bij de "
+                    "conversie naar het huidige systeem is overgezet. Live "
+                    "geverifieerd (2026-11-17) via ceo:registratiedatum: 41.132 van "
+                    "de 41.514 objecten met een archis2Vondstmeldingsnummer hebben "
+                    "registratiedatum 2016 (de conversie), en van de ~25.000 "
+                    "Vondstlocaties die sinds 2017 zijn geregistreerd hebben er "
+                    "slechts 382 nog zo'n nummer (2023 en 2024: 0). "
+                    "archis2Monumentnummer en archis2Complexnummer: vrijwel alles "
+                    "met registratiedatum 2015 (conversie), een nagekomen partij in "
+                    "2019, daarna niets meer. Gevolgen: (1) gebruik een Archis2-"
+                    "nummer alleen om een BESTAAND, oud nummer op te zoeken (bv. uit "
+                    "een rapport of publicatie van voor de conversie); (2) gebruik "
+                    "het NOOIT om 'alle' vondstmeldingen, waarnemingen of terreinen "
+                    "te tellen of te selecteren -- alles van na de conversie valt "
+                    "dan stil weg; gebruik daarvoor de class (bv. ?x a "
+                    "ceo:Vondstlocatie) en ceo:cultuurhistorischObjectnummer; "
+                    "(3) meld bij een vraag naar een recente melding dat Archis2-"
+                    "nummers daarvoor niet bestaan; (4) ceo:registratiedatum is de "
+                    "datum van registratie in het huidige systeem, NIET de datum van "
+                    "de oorspronkelijke melding -- voor geconverteerde records is "
+                    "dat dus 2015/2016, ongeacht hoe oud de melding werkelijk is. "
+                    "Uitzondering: ceo:archis2Waarnemingsnummer wordt nog wel bij "
+                    "nieuw geregistreerde records ingevuld (2025: 1.319, 2026: "
+                    "3.186) -- het ontbreken ervan zegt dus niets over de ouderdom.\n"
                     "Archis2-nummers zijn xsd:string -- filter altijd met "
                     "aanhalingstekens. Elk nummer hoort bij een specifieke class "
                     "(rdfs:domain): ceo:archis2Monumentnummer -> ceo:ArcheologischTerrein "
@@ -960,6 +1050,387 @@ SEMANTIC_TOPICS = {
                     "gemeentegrenzen vallen niet 1-op-1 samen (bv. de kern Cothen ligt "
                     "BAG-woonplaats-gewijs dicht bij Bunnik maar valt gemeentelijk onder "
                     "Wijk bij Duurstede), wat tot een verkeerd (te hoog) aantal leidt."
+                ),
+            },
+        ],
+    },
+    "formeel_standpunt": {
+        "title": "Formeel standpunt (ceo:formeelStandpunt true/false)",
+        "description": (
+            "Gebruik dit topic bij ELKE vraag die kennis over een object toont "
+            "of erop filtert: omschrijving, type, functie, naam, gebeurtenis "
+            "(o.a. datering/bouwjaar), stijl en cultuur, materiaal of "
+            "bouwkundige kwaliteit. Al deze gegevens zijn ceo:Kennisregistratie-"
+            "nodes, en elke kennisregistratie draagt de boolean "
+            "ceo:formeelStandpunt (xsd:boolean; rdfs:domain ceo:Kennisregistratie; "
+            "live geverifieerd 2026-11-17: aanwezig op ALLE 3.307.776 "
+            "kennisregistraties, 289.647 true en 3.018.129 false). true = een "
+            "formeel standpunt van de RCE (bv. de officiele registeromschrijving "
+            "van een rijksmonument); false = geregistreerde kennis die GEEN "
+            "formeel standpunt is.\n"
+            "REGEL (afspraak met RCE, 2026-11-17): toon en gebruik standaard "
+            "UITSLUITEND kennis met ceo:formeelStandpunt true. Toon kennis met "
+            "false alleen als de gebruiker daar uitdrukkelijk om vraagt, en "
+            "vermeld er dan bij elke waarde bij dat het geen formeel standpunt "
+            "is. Vermeld in je antwoord altijd dat het om het formele standpunt "
+            "gaat, en zeg het eerlijk als er voor een object alleen niet-formele "
+            "kennis bestaat in plaats van die stilzwijgend te tonen of te doen "
+            "alsof er niets is.\n"
+            "UITZONDERING ARCHEOLOGIE (bevestigd door RCE, 2026-11-17): voor de "
+            "classes ceo:ArcheologischOnderzoeksgebied, ceo:Vondstlocatie, "
+            "ceo:Vondsten, ceo:Grondsporen, ceo:ArcheologischTerrein en "
+            "ceo:ArcheologischComplex heeft ceo:formeelStandpunt GEEN betekenis. "
+            "De boolean staat er in de data wel op (vrijwel altijd false), maar "
+            "zegt daar niets. Filter bij deze classes dus NIET op "
+            "ceo:formeelStandpunt, toon de kennis (omschrijving, type, "
+            "datering, cultuur, materiaal) gewoon, en zet er GEEN vermelding "
+            "'geen formeel standpunt' bij. De regel hierboven geldt voor de "
+            "overige objecten: rijksmonumenten (ook archeologische "
+            "rijksmonumenten, dat zijn ceo:Rijksmonument-objecten), complexen, "
+            "gezichten en werelderfgoed."
+        ),
+        "patterns": [
+            {
+                "name": "Alleen formeel standpunt (standaard)",
+                "path": [
+                    "ceo:heeftOmschrijving",
+                    "ceo:formeelStandpunt",
+                ],
+                "guidance": (
+                    "Zet de boolean op de kennisnode, niet op het object: "
+                    "?cho ceo:heeftOmschrijving ?k . ?k ceo:formeelStandpunt true ; "
+                    "ceo:omschrijving ?tekst . Schrijf de waarde als kale boolean "
+                    "(true), niet als string (\"true\") -- een string matcht de "
+                    "xsd:boolean niet en geeft stil 0 resultaten. Hetzelfde "
+                    "patroon geldt voor ceo:heeftType, ceo:heeftGebeurtenis, "
+                    "ceo:heeftStijlEnCultuur, ceo:heeftMateriaal, "
+                    "ceo:heeftBouwkundigeKwaliteit, ceo:heeftOorspronkelijkeFunctie, "
+                    "ceo:heeftHuidigeFunctie, ceo:heeftNaam en het overkoepelende "
+                    "ceo:heeftKennisregistratie. validate_query() waarschuwt als "
+                    "een query een van de gemengde paden gebruikt zonder "
+                    "ceo:formeelStandpunt, behalve wanneer de query een van de "
+                    "archeologische classes uit de UITZONDERING noemt."
+                ),
+            },
+            {
+                "name": "Verdeling per soort kennis (wat valt weg bij 'alleen true')",
+                "path": ["ceo:formeelStandpunt"],
+                "guidance": (
+                    "Live geteld op 2026-11-17 in graph instanties-rce (true / "
+                    "false per class van de kennisnode): ceo:Functie 75.517 / 0; "
+                    "ceo:Naam 12.520 / 0; ceo:BouwkundigeKwaliteit 9.178 / 0; "
+                    "ceo:StedenbouwkundigeMorfologischeAanduiding 472 / 0; "
+                    "ceo:Omschrijving 87.061 / 464.541; ceo:Type 29.569 / 878.046; "
+                    "ceo:Gebeurtenis 51.461 / 878.046; ceo:StijlEnCultuur 23.869 / "
+                    "352.758; ceo:Materiaal 0 / 444.738. Functie en naam zijn dus "
+                    "altijd formeel (het filter verandert daar niets aan). De "
+                    "grote aantallen false komen vrijwel geheel van de "
+                    "archeologische classes, waar de boolean geen betekenis "
+                    "heeft (zie de UITZONDERING in de beschrijving van dit topic): "
+                    "materiaal komt bv. alleen bij ceo:Vondsten voor en wordt daar "
+                    "gewoon getoond."
+                ),
+            },
+            {
+                "name": "Verdeling per objectsoort",
+                "path": ["ceo:heeftOmschrijving", "ceo:formeelStandpunt"],
+                "guidance": (
+                    "Live geteld op 2026-11-17, omschrijvingen per objectclass "
+                    "(true / false): Rijksmonument 67.415 / 4.859; Complex 2.513 "
+                    "/ 0; ArcheologischComplex 17.108 / 11.692; "
+                    "ArcheologischTerrein 25 / 11.212; "
+                    "ArcheologischOnderzoeksgebied 0 / 66.477; Vondstlocatie 0 / "
+                    "111.988; Vondsten 0 / 216.531; Grondsporen 0 / 41.782. "
+                    "De regel 'alleen true' geldt voor Rijksmonument (daar maakt "
+                    "hij verschil: 4.859 niet-formele omschrijvingen) en Complex. "
+                    "Op Rijksmonument zijn heeftType (10.981), heeftGebeurtenis "
+                    "(32.873), heeftStijlEnCultuur (23.869) en "
+                    "heeftOorspronkelijkeFunctie (69.887) allemaal true. Voor de "
+                    "zes archeologische classes in dit lijstje heeft de boolean "
+                    "geen betekenis: negeer hem daar volledig, ook de 17.108 "
+                    "true-waarden bij ArcheologischComplex zeggen niets."
+                ),
+            },
+            {
+                "name": "Niet-formele kennis tonen (alleen op uitdrukkelijk verzoek)",
+                "path": ["ceo:heeftKennisregistratie", "ceo:formeelStandpunt"],
+                "guidance": (
+                    "Vraagt de gebruiker er uitdrukkelijk om? Selecteer dan de "
+                    "boolean mee en toon hem als kolom, in plaats van het filter "
+                    "weg te laten: ?cho ceo:heeftOmschrijving ?k . ?k "
+                    "ceo:formeelStandpunt ?formeel ; ceo:omschrijving ?tekst . "
+                    "Zet in het antwoord bij elke rij 'formeel standpunt' of 'geen "
+                    "formeel standpunt'. Laat het filter nooit ongemerkt weg."
+                ),
+            },
+        ],
+    },
+    "gemeenten": {
+        "title": "Gemeenten en gemeentelijke herindelingen (OWMS / TOOI)",
+        "description": (
+            "Gebruik dit topic bij elke vraag met een gemeentefilter. "
+            "ceo:heeftGemeente (via ceo:heeftBasisregistratieRelatie) wijst "
+            "ALTIJD naar een OWMS-gemeenteconcept in de graph 'owms' (live "
+            "geverifieerd 2026-11-17: 402 verschillende gemeenten, allemaal "
+            "http://standaarden.overheid.nl/owms/terms/...). De graph "
+            "'tooi-gemeenten' wordt niet als doel van heeftGemeente gebruikt; "
+            "het is een naslaggraph (gemeentecode, begin-/einddatum, "
+            "wijzigingen).\n"
+            "BELANGRIJKSTE VALKUIL: de gemeentekoppeling is bij herindelingen "
+            "NIET volledig en niet altijd naar de juiste gemeente omgezet. 61 "
+            "van de 402 gebruikte gemeenten zijn opgeheven, samen 5.091 "
+            "relaties (1.065 Rijksmonument-objecten over 58 opgeheven "
+            "gemeenten, 1.793 archeologische onderzoeksgebieden, 2.233 "
+            "vondstlocaties). Drie situaties: (1) ACTIEVE rijksmonumenten "
+            "(status 'rijksmonument') zijn overal omgezet naar de huidige "
+            "gemeente, met precies een uitzondering: Voorne aan Zee (sinds "
+            "2023-01-01) heeft zelf 0 objecten -- alle 448 actieve "
+            "rijksmonumenten van dat grondgebied staan op voorganger "
+            "Westvoorne, ook de ruim 350 met BAG-woonplaats Brielle. "
+            "(2) AFGEVOERDE objecten (status 'geen rijksmonument') zijn niet "
+            "omgezet: 617 stuks over 58 opgeheven gemeenten (bv. Weesp 69, "
+            "Boxmeer 41, Cuijk 13). (3) ARCHEOLOGIE (onderzoeksgebieden, "
+            "vondstlocaties) is niet omgezet voor de herindelingen van "
+            "2021-01-01 t/m 2023-01-01. Een filter op alleen de huidige "
+            "gemeente mist die objecten stil; een filter op alleen een oude "
+            "gemeente geeft een restant (of 0) en zegt niets over wat er "
+            "feitelijk in dat voormalige grondgebied ligt. De naam van de "
+            "gekoppelde gemeente is dus GEEN betrouwbare aanwijzing voor de "
+            "ligging binnen de nieuwe gemeente -- gebruik daarvoor de "
+            "BAG-woonplaats (ceo:woonplaatsnaam op de BAGRelatie) of de "
+            "geometrie."
+        ),
+        "patterns": [
+            {
+                "name": "Gebruik de tools: zij tellen voorgangers mee",
+                "path": [
+                    "ceo:heeftBasisregistratieRelatie",
+                    "ceo:heeftGemeente",
+                ],
+                "guidance": (
+                    "monumenten_in_gemeente() telt standaard "
+                    "(inclusief_voorgangers=True) ook de objecten mee die nog aan "
+                    "een opgeheven voorganger hangen, en toont de uitsplitsing per "
+                    "gemeente. resolve_gemeente() meldt of een gemeente opgeheven "
+                    "is (met einddatum en opvolger) en geeft de URI's van de "
+                    "voorgangers. percelen_via_spatial_join() vertaalt een "
+                    "opgeheven gemeente naar de huidige voordat het Kadaster "
+                    "bevraagt (de KKG kent alleen huidige gemeenten). Vraagt de "
+                    "gebruiker naar een opgeheven gemeente (bv. 'Brielle'), "
+                    "vermeld dan dat die is opgegaan in de opvolger en bied aan "
+                    "het huidige grondgebied op te vragen."
+                ),
+            },
+            {
+                "name": "Handgeschreven query: voorgangers meenemen via OWMS",
+                "path": ["owms:predecessor", "owms:successor", "owms:endDate"],
+                "guidance": (
+                    "In de graph 'owms' (PREFIX owms: "
+                    "<http://standaarden.overheid.nl/owms/terms/>): owms:endDate "
+                    "(xsd:date, 269 gemeenten) = opgeheven; owms:successor = "
+                    "opvolger(s); owms:predecessor = voorganger(s) (270 elk, "
+                    "elkaars inverse); owms:startDate = ontstaan. Neem "
+                    "voorgangers mee met een VALUES-lijst uit resolve_gemeente(), "
+                    "of met een property path: GRAPH <.../graph/owms> { "
+                    "<gemeente-URI> owms:predecessor* ?gem } gevolgd door ?obj "
+                    "ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente ?gem. "
+                    "LET OP gesplitste gemeenten: een voorganger met MEERDERE "
+                    "opvolgers (bv. Haaren, 2020-12-31 -> Boxtel, Oisterwijk, "
+                    "Tilburg en Vught) is niet eenduidig toe te wijzen; "
+                    "owms:predecessor* telt die objecten bij elk van de opvolgers "
+                    "mee en overschat dus. De tools slaan zulke voorgangers "
+                    "daarom over en melden ze apart; bepaal de juiste gemeente "
+                    "dan per object via de geometrie."
+                ),
+            },
+            {
+                "name": "TOOI-graph als naslag",
+                "path": ["tooi:gemeentecode", "tooi:einddatum", "tooi:owmsId"],
+                "guidance": (
+                    "Graph 'tooi-gemeenten' "
+                    "(https://linkeddata.cultureelerfgoed.nl/rce/tooi/graph/gemeenten; "
+                    "PREFIX tooi: <https://identifier.overheid.nl/tooi/def/ont/>): "
+                    "605 gemeenten (bestaand en opgeheven) met tooi:gemeentecode "
+                    "(CBS-code, bv. '1731'), tooi:officieleNaamExclSoort, "
+                    "tooi:begindatum, tooi:einddatum (263x) en tooi:owmsId. "
+                    "Herindelingen staan er als aparte nodes in (tooi:Samenvoeging "
+                    "54, tooi:Uitbreiding 62, tooi:Herschikking 12) met "
+                    "prov:invalidated (opgeheven gemeente), prov:generated (nieuwe "
+                    "gemeente), prov:used en tooi:tijdstipWijziging. VALKUIL: "
+                    "tooi:owmsId is een xsd:anyURI-LITERAL, geen IRI -- een directe "
+                    "join met ceo:heeftGemeente geeft stil 0 resultaten; gebruik "
+                    "FILTER(STR(?owmsId) = STR(?gem)). Actualiteit (2026-11-17): "
+                    "register met zichtdatum 2026-01-29; de laatste herindeling in "
+                    "zowel TOOI als OWMS is die van 2023-01-01 (Voorne aan Zee). "
+                    "Latere herindelingen zijn in deze graphs niet te herkennen -- "
+                    "controleer bij twijfel de actuele gemeente-indeling."
+                ),
+            },
+        ],
+    },
+    "images": {
+        "title": "Afbeeldingen (Beeldbank RCE, los endpoint)",
+        "description": (
+            "Gebruik dit topic voor vragen over foto's, bouwtekeningen, prenten "
+            "en andere afbeeldingen uit de Beeldbank van de RCE. Dit is een "
+            "APARTE dataset (https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen) "
+            "met een eigen endpoint en schema.org-vocabulaire (PREFIX sdo: "
+            "<https://schema.org/>), GEEN CEO-objecten. Gebruik "
+            "query_sparql_afbeeldingen(), niet query_sparql(). De hoofddata "
+            "staat in de named graph "
+            "https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen/graphs/photos "
+            "(565.170 sdo:Photograph, ~18,9 miljoen triples, geteld 2026-11-17); "
+            "zet daar altijd een GRAPH-restrictie op en een LIMIT -- brede "
+            "GROUP BY-scans over deze graph lopen in een timeout."
+        ),
+        "patterns": [
+            {
+                "name": "Foto's bij een rijksmonument",
+                "path": ["sdo:about", "sdo:image", "sdo:contentUrl"],
+                "guidance": (
+                    "Een foto verwijst via sdo:about naar de rijksmonument-URI van "
+                    "het CHO-endpoint (bv. https://linkeddata.cultureelerfgoed.nl/"
+                    "cho-kennis/id/rijksmonument/41069; 329.420 van zulke "
+                    "koppelingen). LET OP: het getal in die URI is het "
+                    "cultuurhistorischObjectnummer, NIET het rijksmonumentnummer, "
+                    "en de fotograph bevat zelf geen ceo:rijksmonumentnummer. "
+                    "Werk daarom in twee stappen: (1) zoek met query_sparql() de "
+                    "monument-URI bij een rijksmonumentnummer; (2) gebruik die URI "
+                    "hier: SELECT ?foto ?titel ?datum ?url ?thumb WHERE { GRAPH "
+                    "<.../rce/afbeeldingen/graphs/photos> { ?foto a sdo:Photograph ; "
+                    "sdo:about <monument-URI> ; sdo:name ?titel ; sdo:image ?img . "
+                    "?img sdo:contentUrl ?url ; sdo:thumbnailUrl ?thumb . OPTIONAL "
+                    "{ ?foto sdo:dateCreated ?datum } } } LIMIT 50. Een "
+                    "SERVICE-federatie tussen de twee endpoints is niet getest; "
+                    "doe het in twee losse aanroepen."
+                ),
+            },
+            {
+                "name": "Velden van een foto",
+                "path": ["sdo:name", "sdo:creator", "sdo:dateCreated", "sdo:license"],
+                "guidance": (
+                    "Op de sdo:Photograph: sdo:name (titel/beschrijving), "
+                    "sdo:dateCreated (string, wisselende precisie: '2007-07', "
+                    "'1965'), sdo:creator -> sdo:Person met sdo:name ('Achternaam, "
+                    "Voornaam'), sdo:contentLocation -> sdo:Place met sdo:name (bv. "
+                    "'Dorpsstraat 84, Zuid-Beijerland') en sdo:address -> "
+                    "sdo:PostalAddress (sdo:streetAddress, sdo:addressLocality, "
+                    "sdo:postalCode), sdo:url (detailpagina op "
+                    "beeldbank.cultureelerfgoed.nl), sdo:license, sdo:isPartOf -> "
+                    "sdo:Collection (bv. 'Fotocollectie', 'RCE - Gebouwd'), en "
+                    "sdo:about -> sdo:DefinedTerm met sdo:name voor trefwoorden "
+                    "(bv. 'Herbestemming'; 601.899 koppelingen). Het beeld zelf: "
+                    "sdo:image -> sdo:ImageObject met sdo:contentUrl (volledig "
+                    "formaat), sdo:thumbnailUrl (350x350) en sdo:encodingFormat. "
+                    "Literals zijn niet taalgetagd: CONTAINS(LCASE(?titel), ...) "
+                    "werkt zonder STR()."
+                ),
+            },
+            {
+                "name": "Identificatienummers en licentie",
+                "path": ["sdo:identifier", "sdo:propertyID", "sdo:value"],
+                "guidance": (
+                    "Nummers zitten in sdo:identifier -> sdo:PropertyValue met "
+                    "sdo:propertyID en sdo:value. Voorkomende propertyID's: "
+                    "'inventarisnummer' (bv. 'OF-01381', '528.367'), "
+                    "'beeldbank-uuid' en 'priref'. Filter op een nummer met: "
+                    "?foto sdo:identifier ?id . ?id sdo:propertyID "
+                    "\"inventarisnummer\" ; sdo:value \"528.367\" . Licenties "
+                    "(sdo:license): overwegend CC BY-SA 3.0 "
+                    "(http://creativecommons.org/licenses/by-sa/3.0/) en CC BY-SA "
+                    "4.0 -- vermeld de licentie en de maker bij het tonen of "
+                    "hergebruiken van een afbeelding."
+                ),
+            },
+            {
+                "name": "Alternatief op het CHO-endpoint: graph 'image'",
+                "path": ["edm:aggregatedCHO", "ceo:rijksmonumentnummer", "edm:isShownBy"],
+                "guidance": (
+                    "De graph 'image' (ook op het CHO-endpoint, dus met "
+                    "query_sparql()) bevat edm:ProvidedCHO-records die WEL direct "
+                    "ceo:rijksmonumentnummer dragen (91.834 in de kopie op het "
+                    "afbeeldingen-endpoint), plus edm:aggregatedCHO "
+                    "(rijksmonument-URI), dc:title, dc:description, dc:rights, "
+                    "edm:isShownBy (Wikimedia-thumbnail), edm:isShownAt en "
+                    "foaf:depiction. Handig voor een snelle 'eerste foto bij "
+                    "rijksmonumentnummer X' in een enkele query; voor de volledige "
+                    "collectie met maker, datum en plaats gebruik je de fotograph "
+                    "hierboven."
+                ),
+            },
+        ],
+    },
+    "library": {
+        "title": "Bibliotheek (catalogus RCE, los endpoint)",
+        "description": (
+            "Gebruik dit topic voor vragen over literatuur: boeken en "
+            "tijdschriftartikelen uit de bibliotheekcatalogus van de RCE. Dit is "
+            "een APARTE dataset (https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek) "
+            "met een eigen endpoint en schema.org-vocabulaire (PREFIX sdo: "
+            "<https://schema.org/>), GEEN CEO-objecten. Gebruik "
+            "query_sparql_bibliotheek(), niet query_sparql(). Twee named graphs "
+            "(geteld 2026-11-17): .../rce/bibliotheek/graphs/books (155.422 "
+            "sdo:Book) en .../rce/bibliotheek/graphs/article (26.265 "
+            "sdo:Article). Zet altijd een GRAPH-restrictie en een LIMIT; de "
+            "dataset bevat daarnaast oudere graphs (.../graph/bib e.d.) met "
+            "ook boeken -- zonder GRAPH-restrictie riskeer je dubbelen."
+        ),
+        "patterns": [
+            {
+                "name": "Boeken",
+                "path": ["a sdo:Book", "sdo:name", "sdo:author", "sdo:datePublished"],
+                "guidance": (
+                    "In graph .../graphs/books: ?boek a sdo:Book ; sdo:name ?titel . "
+                    "Verder: sdo:author / sdo:creator -> sdo:Person of "
+                    "sdo:Organization met sdo:name ('Achternaam, Voorletters'), "
+                    "sdo:datePublished (jaartal als string, bv. '1979'), "
+                    "sdo:publisher -> sdo:Organization, sdo:locationCreated -> "
+                    "sdo:Place, sdo:numberOfPages, sdo:size, sdo:isPartOf -> reeks "
+                    "(sdo:CreativeWorkSeries), en sdo:url (detailpagina op "
+                    "catalogus.cultureelerfgoed.nl -- geef die mee in het "
+                    "antwoord). Identificatie via sdo:identifier -> "
+                    "sdo:PropertyValue met sdo:propertyID 'priref'. Literals zijn "
+                    "niet taalgetagd: FILTER(CONTAINS(LCASE(?titel), \"kasteel\")) "
+                    "werkt direct."
+                ),
+            },
+            {
+                "name": "Tijdschriftartikelen",
+                "path": ["a sdo:Article", "sdo:isPartOf", "sdo:pageStart"],
+                "guidance": (
+                    "In graph .../graphs/article: ?art a sdo:Article ; sdo:name "
+                    "?titel . Verder sdo:author, sdo:datePublished, sdo:pageStart / "
+                    "sdo:pageEnd, sdo:description, sdo:url. De bron loopt via een "
+                    "keten van sdo:isPartOf: Article -> sdo:PublicationIssue "
+                    "(sdo:issueNumber) -> sdo:PublicationVolume (sdo:volumeNumber, "
+                    "sdo:datePublished) -> sdo:Periodical (sdo:name = "
+                    "tijdschrifttitel; 658 tijdschriften). Voorbeeld: ?art "
+                    "sdo:isPartOf/sdo:isPartOf/sdo:isPartOf ?tijdschrift . "
+                    "?tijdschrift a sdo:Periodical ; sdo:name ?tsNaam ."
+                ),
+            },
+            {
+                "name": "Onderwerp: thesaurusterm, plaats of rijksmonument",
+                "path": ["sdo:about", "sdo:spatialCoverage"],
+                "guidance": (
+                    "sdo:about heeft meerdere soorten doelen: (a) CHT- en "
+                    "ABR-concepten (https://data.cultureelerfgoed.nl/term/id/cht/... "
+                    "resp. .../abr/...; in books 250.377 resp. 18.595 koppelingen) "
+                    "-- dezelfde concept-URI's als in de CHO-dataset, dus te vinden "
+                    "met zoek_concept_termennetwerk() en daarna hier te gebruiken "
+                    "als ?boek sdo:about <concept-URI>; de CHT- en ABR-"
+                    "thesaurusgraphs staan ook op dit endpoint, voor labels; "
+                    "(b) eigen trefwoorden (sdo:DefinedTerm met sdo:name); "
+                    "(c) personen; (d) monumenten: sdo:about -> "
+                    "sdo:LandmarksOrHistoricalBuildings -> sdo:identifier -> "
+                    "sdo:PropertyValue met sdo:propertyID \"rijksmonumentnummer\" en "
+                    "sdo:value \"36769\" (string). Literatuur over een rijksmonument: "
+                    "?boek sdo:about ?m . ?m sdo:identifier ?id . ?id sdo:propertyID "
+                    "\"rijksmonumentnummer\" ; sdo:value \"36769\" . Deze koppeling is "
+                    "dun (3.035 monumentverwijzingen in books, 695 in article) -- "
+                    "0 treffers betekent niet dat er geen literatuur is; zoek dan "
+                    "ook op plaats (sdo:spatialCoverage -> sdo:Place met sdo:name, "
+                    "bv. 'Eede') en op titelwoorden."
                 ),
             },
         ],

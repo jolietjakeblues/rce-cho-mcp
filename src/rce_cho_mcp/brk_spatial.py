@@ -86,7 +86,7 @@ import re
 import urllib.error
 
 from rce_cho_mcp.config import DEFAULT_DATASET_GRAPH, KKG_SPARQL_ENDPOINT
-from rce_cho_mcp.gemeente import _OWMS_GRAPH
+from rce_cho_mcp.gemeente import _OWMS_GRAPH, huidige_gemeentenamen
 from rce_cho_mcp.sparql import escape_sparql_string as _escape_sparql_string
 from rce_cho_mcp.sparql import execute_sparql, is_safe_iri, post_sparql
 from rce_cho_mcp.sparql import rows as _rows
@@ -164,10 +164,24 @@ SELECT DISTINCT ?gemeenteUri ?naam WHERE {{
 """
     gemeente_rows = _rows(execute_sparql(gemeente_query, timeout=_RCE_TIMEOUT))
 
+    # RCE's heeftGemeente is bij gemeentelijke herindelingen niet volledig
+    # omgezet, terwijl de KKG alleen de huidige gemeentegebieden kent (live
+    # geverifieerd 2026-11-17: imxgeo:naam "Voorne aan Zee" bestaat, "Brielle"
+    # niet). Zonder deze vertaling gaf de KKG-join voor elk monument dat nog
+    # aan een opgeheven gemeente hangt stil 0 percelen. Vertaal daarom elke
+    # gemeente naar zijn huidige opvolger(s); bij een gesplitste gemeente
+    # (meerdere opvolgers) worden alle opvolgers doorzocht.
+    gemeente_namen: list[str] = []
+    for row in gemeente_rows:
+        opvolgers = huidige_gemeentenamen(row["gemeenteUri"]["value"])
+        for naam in opvolgers or [row["naam"]["value"]]:
+            if naam not in gemeente_namen:
+                gemeente_namen.append(naam)
+
     return {
         "wkts": [r["wkt"]["value"] for r in wkt_rows],
         "gemeente_uris": [r["gemeenteUri"]["value"] for r in gemeente_rows],
-        "gemeente_namen": [r["naam"]["value"] for r in gemeente_rows],
+        "gemeente_namen": gemeente_namen,
     }
 
 

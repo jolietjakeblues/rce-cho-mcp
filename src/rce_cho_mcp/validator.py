@@ -6,6 +6,7 @@ from rce_cho_mcp.pitfalls import (
     LANGUAGE_TAG_WARNING,
     TWO_STAGE_SUBQUERY_REMEDY,
 )
+from rce_cho_mcp.semantics import FORMEEL_STANDPUNT_EXEMPT_CLASSES
 
 FORBIDDEN_PREFIXES = [
     "ceosp:",
@@ -45,6 +46,16 @@ GEOSPARQL_RELATIONS = re.compile(
 )
 
 OPTIONAL_BLOCK_PATTERN = re.compile(r"\bOPTIONAL\b", re.IGNORECASE)
+
+# Kennispaden waarvan de kennisnodes zowel ceo:formeelStandpunt true als
+# false hebben (zie _find_missing_formeel_standpunt).
+MIXED_FORMEEL_STANDPUNT_PATTERN = re.compile(
+    r"ceo:(heeftOmschrijving|heeftType|heeftGebeurtenis|heeftStijlEnCultuur|"
+    r"heeftMateriaal|heeftKennisregistratie)\b"
+)
+EXEMPT_CLASS_PATTERN = re.compile(
+    r"(?:ceo:|ceo#)(?:" + "|".join(FORMEEL_STANDPUNT_EXEMPT_CLASSES) + r")\b"
+)
 
 # Properties die in deze dataset ongetypeerde string-literals zijn (bv. "19"),
 # geen xsd:integer. Een kaal getal (ceo:huisnummer 19) matcht dan niets en
@@ -213,6 +224,45 @@ def _find_untyped_numeric_literal_risk(query: str) -> list[str]:
     return warnings
 
 
+def _find_missing_formeel_standpunt(query: str) -> list[str]:
+    """Detecteer een kennispad met gemengde formeelStandpunt-waarden dat
+    zonder ceo:formeelStandpunt wordt gebruikt.
+
+    Afspraak met RCE (2026-11-17): standaard mag alleen kennis met
+    ceo:formeelStandpunt true getoond worden. Live geteld (2026-11-17) is
+    het merendeel van deze kennisregistraties false (bv. ceo:Type 878.046
+    false tegenover 29.569 true), dus een query zonder dit filter toont
+    vooral niet-formele kennis zonder dat dat zichtbaar is. Vlagt bewust
+    NIET heeftNaam en de functiepaden: die zijn in de data 100% true, het
+    filter verandert daar niets aan.
+    """
+    if "formeelstandpunt" in query.lower():
+        return []
+    # Bij de archeologische classes heeft de boolean geen betekenis (RCE,
+    # 2026-11-17): daar hoort juist NIET gefilterd te worden, dus geen
+    # waarschuwing zodra de query zo'n class noemt.
+    if EXEMPT_CLASS_PATTERN.search(query):
+        return []
+    found = sorted({m.group(1) for m in MIXED_FORMEEL_STANDPUNT_PATTERN.finditer(query)})
+    if not found:
+        return []
+    paden = ", ".join(f"ceo:{name}" for name in found)
+    return [
+        f"{paden} gebruikt zonder ceo:formeelStandpunt. Deze kennisregistraties "
+        "zijn deels (of grotendeels) GEEN formeel standpunt van de RCE. Toon "
+        "standaard alleen het formele standpunt: voeg op de kennisnode "
+        "'ceo:formeelStandpunt true' toe (bv. ?cho ceo:heeftOmschrijving ?k . "
+        "?k ceo:formeelStandpunt true ; ceo:omschrijving ?tekst). Wil de "
+        "gebruiker uitdrukkelijk ook niet-formele kennis zien, selecteer dan "
+        "ceo:formeelStandpunt als kolom mee en vermeld het per waarde. Gaat "
+        "de query over een archeologische class (ArcheologischOnderzoeksgebied, "
+        "Vondstlocatie, Vondsten, Grondsporen, ArcheologischTerrein, "
+        "ArcheologischComplex)? Dan heeft de boolean geen betekenis: negeer "
+        "deze waarschuwing en filter NIET. Zie "
+        "semantics_describe_topic('formeel_standpunt')."
+    ]
+
+
 def _find_geosparql_timeout_risk(query: str) -> list[str]:
     """Detecteer GeoSPARQL-relaties die structureel timeout veroorzaken op dit endpoint."""
     matches = GEOSPARQL_RELATIONS.findall(query)
@@ -369,6 +419,7 @@ def validate_sparql(query: str) -> dict:
     warnings.extend(_find_order_by_optional_timeout_risk(q))
     warnings.extend(_find_cartesian_product_risk(q))
     warnings.extend(_find_untyped_numeric_literal_risk(q))
+    warnings.extend(_find_missing_formeel_standpunt(q))
 
     select_pos = q_upper.find("SELECT")
     from_pos = q_upper.find("FROM")

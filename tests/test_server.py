@@ -9,7 +9,7 @@ import pytest
 
 import rce_cho_mcp.server as server
 
-EXPECTED_TOOL_COUNT = 28
+EXPECTED_TOOL_COUNT = 30
 
 
 def _tools():
@@ -46,6 +46,8 @@ def test_every_tool_has_a_description():
         ("percelen_via_spatial_join", "limit", 1, 500),
         ("query_sparql", "max_rows", 1, 10_000),
         ("query_sparql_mass", "max_rows", 1, 10_000),
+        ("query_sparql_afbeeldingen", "max_rows", 1, 10_000),
+        ("query_sparql_bibliotheek", "max_rows", 1, 10_000),
         ("zoek_concept_termennetwerk", "max_resultaten", 1, 100),
     ],
 )
@@ -63,3 +65,17 @@ async def test_out_of_range_limit_is_rejected_before_the_function_runs():
 
 def test_mass_tool_is_registered():
     assert "query_sparql_mass" in _tools()
+
+
+def test_afbeeldingen_and_bibliotheek_tools_are_registered():
+    assert "query_sparql_afbeeldingen" in _tools()
+    assert "query_sparql_bibliotheek" in _tools()
+
+
+def test_monumenten_in_gemeente_counts_predecessors_by_default():
+    schema = _tools()["monumenten_in_gemeente"].parameters["properties"]
+    assert schema["inclusief_voorgangers"]["default"] is True
+
+
+def test_query_sparql_description_mentions_formeel_standpunt():
+    assert "formeelStandpunt true" in _tools()["query_sparql"].description

@@ -28,3 +28,24 @@ def test_default_dataset_graph_is_instanties_rce():
 def test_mass_endpoint_configured():
     assert MASS_SPARQL_ENDPOINT.startswith("https://")
     assert "mass" in MASS_SPARQL_ENDPOINT
+
+
+def test_afbeeldingen_and_bibliotheek_endpoints_configured():
+    from rce_cho_mcp.config import AFBEELDINGEN_SPARQL_ENDPOINT, BIBLIOTHEEK_SPARQL_ENDPOINT
+
+    assert AFBEELDINGEN_SPARQL_ENDPOINT.endswith("/datasets/rce/afbeeldingen/sparql")
+    assert BIBLIOTHEEK_SPARQL_ENDPOINT.endswith("/datasets/rce/bibliotheek/sparql")
+
+
+def test_other_dataset_graphs_are_listed_but_not_cho_graph_names():
+    """De graphs van Afbeeldingen/Bibliotheek bestaan niet op het CHO-endpoint:
+    wel tonen in graphs_list(), niet toelaten als graph_name voor
+    resolve_concept_label()."""
+    from rce_cho_mcp.graphs import OTHER_DATASET_GRAPH_ROWS
+
+    out = format_graphs()
+    for row in OTHER_DATASET_GRAPH_ROWS:
+        assert row["uri"] in out
+        assert row["tool"] in out
+        assert row["key"] not in KNOWN_GRAPHS
+        assert row["uri"] not in KNOWN_GRAPHS.values()

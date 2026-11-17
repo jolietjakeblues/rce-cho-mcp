@@ -211,3 +211,41 @@ def test_has_blocking_errors_true_for_invalid():
 
 def test_has_blocking_errors_false_for_valid():
     assert has_blocking_errors("SELECT ?s WHERE { ?s ?p ?o }") is False
+
+
+def test_mixed_knowledge_path_without_formeel_standpunt_warns():
+    q = (
+        "SELECT DISTINCT ?t WHERE { GRAPH <g> { "
+        "?cho ceo:heeftOmschrijving ?k . ?k ceo:omschrijving ?t } } LIMIT 5"
+    )
+    warnings = validate_sparql(q)["warnings"]
+    assert any("formeelStandpunt" in w and "ceo:heeftOmschrijving" in w for w in warnings)
+
+
+def test_mixed_knowledge_path_with_formeel_standpunt_does_not_warn():
+    q = (
+        "SELECT DISTINCT ?t WHERE { GRAPH <g> { "
+        "?cho ceo:heeftOmschrijving ?k . ?k ceo:formeelStandpunt true ; "
+        "ceo:omschrijving ?t } } LIMIT 5"
+    )
+    assert not any("formeelStandpunt" in w for w in validate_sparql(q)["warnings"])
+
+
+def test_archaeology_class_suppresses_formeel_standpunt_warning():
+    # Bij de archeologische classes heeft de boolean geen betekenis (RCE,
+    # 2026-11-17): daar hoort juist niet gefilterd te worden.
+    q = (
+        "SELECT DISTINCT ?t WHERE { GRAPH <g> { ?v a ceo:Vondstlocatie ; "
+        "ceo:heeftOmschrijving ?k . ?k ceo:omschrijving ?t } } LIMIT 5"
+    )
+    assert not any("formeelStandpunt" in w for w in validate_sparql(q)["warnings"])
+
+
+def test_always_formal_paths_do_not_trigger_formeel_standpunt_warning():
+    # heeftNaam en de functiepaden zijn in de data 100% formeelStandpunt true;
+    # een waarschuwing daar zou alleen ruis zijn.
+    q = (
+        "SELECT DISTINCT ?n WHERE { GRAPH <g> { ?cho ceo:heeftNaam ?k . "
+        "?k ceo:naam ?n . ?cho ceo:heeftOorspronkelijkeFunctie ?f } } LIMIT 5"
+    )
+    assert not any("formeelStandpunt" in w for w in validate_sparql(q)["warnings"])

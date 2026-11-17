@@ -51,3 +51,38 @@ def test_monument_aard_warning_and_function_path_note_are_shared():
     # (zie test_ontology.py); hier alleen checken dat ze bestaan en niet leeg zijn.
     assert "GEEN fijnmazige" in MONUMENT_AARD_WARNING
     assert "heeftOorspronkelijkeFunctie" in FUNCTION_PATH_NOTE
+
+
+def test_formeel_standpunt_topic_states_the_default_rule():
+    data = describe_topic("formeel_standpunt")
+    assert data["found"] is True
+    assert "UITSLUITEND kennis met ceo:formeelStandpunt true" in data["description"]
+
+
+def test_formeel_standpunt_rule_exempts_archaeology_classes():
+    from rce_cho_mcp.semantics import FORMEEL_STANDPUNT_EXEMPT_CLASSES
+
+    description = describe_topic("formeel_standpunt")["description"]
+    assert "UITZONDERING ARCHEOLOGIE" in description
+    for name in FORMEEL_STANDPUNT_EXEMPT_CLASSES:
+        assert f"ceo:{name}" in description
+    assert "GEEN betekenis" in describe_topic("archaeology")["description"]
+
+
+def test_archaeology_topic_documents_archis2_period():
+    data = describe_topic("archaeology")
+    archis = next(p for p in data["patterns"] if "Archis2" in p["name"])
+    assert "niet meer" in archis["guidance"]
+    assert "registratiedatum" in archis["guidance"]
+
+
+def test_gemeenten_topic_covers_herindelingen():
+    data = describe_topic("gemeenten")
+    assert data["found"] is True
+    assert "herindeling" in data["description"]
+    assert any("owms:predecessor" in p["path"] for p in data["patterns"])
+
+
+def test_images_and_library_topics_point_to_their_own_tools():
+    assert "query_sparql_afbeeldingen" in describe_topic("images")["description"]
+    assert "query_sparql_bibliotheek" in describe_topic("library")["description"]
