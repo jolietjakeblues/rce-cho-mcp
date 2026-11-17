@@ -458,6 +458,7 @@ workflows.
 
 Huidige resources:
 
+- `rce-cho://verwijzingen` (LDV-frontend, SPARQL-endpoints en CEO-ontologie; ook als tool `verwijzingen`)
 - `rce-cho://graphs`
 - `rce-cho://ontology/statistics`
 - `rce-cho://semantics/topics`

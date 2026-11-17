@@ -27,6 +27,7 @@ from rce_cho_mcp.ontology.api import (
     statistics,
 )
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
+from rce_cho_mcp.references import format_references
 from rce_cho_mcp.resolver import describe_resource, resolve_label
 from rce_cho_mcp.semantics import format_topic, format_topics
 from rce_cho_mcp.sparql import (
@@ -60,6 +61,22 @@ mcp = FastMCP("RCE CHO SPARQL", instructions=WORKFLOW_INSTRUCTIONS)
 def ping() -> str:
     """Test of de MCP-server bereikbaar is."""
     return "RCE CHO MCP werkt."
+
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+def verwijzingen() -> str:
+    """Geef de verwijzingen naar de bronnen achter deze server: de Linked
+    Data Voorziening (LDV) van de RCE -- de frontend op
+    linkeddata.cultureelerfgoed.nl en de SPARQL-endpoints per dataset (CHO,
+    MASS, Afbeeldingen, Bibliotheek) -- en de CEO-ontologie (ontologie-URI,
+    namespace, het bronbestand CEO_RCE.ttl en de versie van de gebundelde
+    kopie).
+
+    Gebruik dit wanneer de gebruiker vraagt waar de data vandaan komt, de
+    data zelf wil bekijken, een query zelf wil uitvoeren in de
+    SPARQL-editor, of de ontologie wil inzien. Geen netwerkaanroep.
+    """
+    return format_references()
+
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def graphs_list() -> str:
@@ -856,6 +873,19 @@ def convert_rd_to_wgs84(x: float, y: float) -> dict:
 )
 def graphs_resource() -> str:
     return format_graphs()
+
+
+@mcp.resource(
+    "rce-cho://verwijzingen",
+    name="Verwijzingen (LDV en CEO-ontologie)",
+    description=(
+        "Links naar de Linked Data Voorziening van de RCE (frontend en "
+        "SPARQL-endpoints) en naar de CEO-ontologie (CEO_RCE.ttl)."
+    ),
+    mime_type="text/plain",
+)
+def verwijzingen_resource() -> str:
+    return format_references()
 
 
 @mcp.resource(

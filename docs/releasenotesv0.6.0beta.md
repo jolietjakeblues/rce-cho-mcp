@@ -7,7 +7,7 @@ counted against the live endpoints on that date.
 ### New
 
 - Two new tools for separate RCE datasets, each with its own endpoint and
-  schema.org vocabulary (30 tools in total, was 28):
+  schema.org vocabulary (with `verwijzingen` below: 31 tools in total, was 28):
   - `query_sparql_afbeeldingen` -- the RCE image library (Beeldbank), graph
     `.../rce/afbeeldingen/graphs/photos`: 565,170 photographs and drawings
     with image URLs, creator, date, place, licence and a link to
@@ -16,6 +16,11 @@ counted against the live endpoints on that date.
     `.../rce/bibliotheek/graphs/books` (155,422 books) and
     `.../graphs/article` (26,265 journal articles), searchable by CHT/ABR
     subject, place or rijksmonumentnummer
+- New tool `verwijzingen` and resource `rce-cho://verwijzingen`: links to
+  the RCE Linked Data Voorziening (frontend, SPARQL editor and SPARQL
+  endpoint per dataset) and to the CEO ontology (ontology URI, namespace,
+  the source file `CEO_RCE.ttl` and the version of the bundled copy). The
+  same references are in a new README section (issue #29)
 - Four new dataset-semantics topics: `images`, `library`,
   `formeel_standpunt` and `gemeenten`
 - `graphs_list()` now also lists the graphs of these two datasets, in a
@@ -80,7 +85,7 @@ counted against the live endpoints on that date.
 
 ### Housekeeping
 
-- Test suite extended from 145 to 165 tests (predecessor selection,
+- Test suite extended from 145 to 170 tests (predecessor selection,
   merger reporting, the formal-position warning and its archaeology
   exception, the new tools and topics)
 - README, CAPABILITIES.md and the connector explainer updated to reflect

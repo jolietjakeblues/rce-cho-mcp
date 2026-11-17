@@ -41,6 +41,11 @@ vraag over literatuur (boeken, tijdschriftartikelen)? Gebruik
 query_sparql_bibliotheek() na semantics_describe_topic('library'). Ook dit
 zijn aparte datasets met een eigen endpoint en schema.org-vocabulaire.
 
+Vraagt de gebruiker waar de data vandaan komt, of wil hij de data, een
+query of de ontologie zelf bekijken? Gebruik verwijzingen() voor de links
+naar de Linked Data Voorziening (LDV) van de RCE (frontend en
+SPARQL-endpoints) en naar de CEO-ontologie (CEO_RCE.ttl).
+
 Drie vaste regels voor het CHO-endpoint (afgestemd met RCE, 2026-11-17):
 
 A. FORMEEL STANDPUNT. Kennis over een object (omschrijving, type,
