@@ -51,7 +51,15 @@ KNOWN_GRAPH_ROWS = [
         "key": "gezicht-hvdl",
         "uri": "https://linkeddata.cultureelerfgoed.nl/graph/gezicht_hvdl",
         "group": "domain",
-        "description": "Protected town and village view data.",
+        "description": (
+            "HVDL-aanvulling op beschermde stads- en dorpsgezichten (482 "
+            "ceo:Gezicht): oppervlakte (ceo:oppervlakteInHectare / "
+            "InVierkanteKilometers), ceo:inProceduredatumGezicht, "
+            "ceo:begrenzingsdatumGezicht, ceo:intrekkingsdatumGezicht, "
+            "ceo:heeftOndergrondGezicht, ceo:wordtGetoondOp en een "
+            "ceo:asWKT-RD-punt (RD). LET OP: de WGS84-polygoon (geo:asWKT) "
+            "staat NIET hier maar in instanties-rce."
+        ),
     },
     {
         "key": "groenaanleg",
@@ -63,7 +71,13 @@ KNOWN_GRAPH_ROWS = [
         "key": "image",
         "uri": "https://linkeddata.cultureelerfgoed.nl/graph/image",
         "group": "media",
-        "description": "Image metadata graph.",
+        "description": (
+            "Beeldbank-afbeeldingen bij rijksmonumenten (edm:ProvidedCHO met "
+            "edm:aggregatedCHO -> rijksmonument, ceo:rijksmonumentnummer, "
+            "edm:isShownBy, foaf:depiction). Voor de volledige Beeldbank "
+            "(565.170 foto's): zie de aparte dataset 'afbeeldingen' "
+            "(query_sparql_afbeeldingen, semantics_describe_topic('images'))."
+        ),
     },
     {
         "key": "image-1",
@@ -129,7 +143,13 @@ KNOWN_GRAPH_ROWS = [
         "key": "werelderfgoed-hvdl",
         "uri": "https://linkeddata.cultureelerfgoed.nl/graph/werelderfgoed_hvdl",
         "group": "domain",
-        "description": "World heritage related graph.",
+        "description": (
+            "HVDL-aanvulling op werelderfgoed (18 ceo:Werelderfgoed): "
+            "ceo:jaarVanInschrijving, ceo:heeftWerelderfgoedType "
+            "(cultuur/natuur/gemengd), oppervlakte (ceo:oppervlakteInHectare / "
+            "InVierkanteKilometers / InVierkanteMeters op de Geometrie-node) "
+            "en ceo:wordtGetoondOp (link naar whc.unesco.org)."
+        ),
     },
     {
         "key": "ceox-vuurtorens",
@@ -174,6 +194,53 @@ KNOWN_GRAPH_ROWS = [
         "group": "external",
         "description": "External OWMS graph from TriplyDB/KOOP.",
         "queryable": False,
+    },
+]
+
+# Graphs in ANDERE RCE-datasets dan CHO: elk met een eigen SPARQL-endpoint en
+# een eigen query-tool. Bewust een aparte lijst en NIET in KNOWN_GRAPH_ROWS:
+# die voedt de allowlist van resolve_concept_label() (config.KNOWN_GRAPHS),
+# en dat is een CHO-endpoint-tool -- een GRAPH-clause met een van deze URI's
+# op het CHO-endpoint geeft stil 0 resultaten. Aantallen live geteld op
+# 2026-11-17.
+OTHER_DATASET_GRAPH_ROWS = [
+    {
+        "dataset": "afbeeldingen",
+        "tool": "query_sparql_afbeeldingen",
+        "topic": "images",
+        "browse": "https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen",
+        "key": "afbeeldingen-photos",
+        "uri": "https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen/graphs/photos",
+        "description": (
+            "Beeldbank RCE: 565.170 foto's/tekeningen (sdo:Photograph) met "
+            "beeld-URL's, maker, datum, plaats, licentie en koppeling naar "
+            "rijksmonumenten (sdo:about)."
+        ),
+    },
+    {
+        "dataset": "bibliotheek",
+        "tool": "query_sparql_bibliotheek",
+        "topic": "library",
+        "browse": "https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek",
+        "key": "bibliotheek-books",
+        "uri": "https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek/graphs/books",
+        "description": (
+            "Bibliotheekcatalogus RCE, boeken: 155.422 sdo:Book met titel, "
+            "auteur, jaar, uitgever, onderwerpen (CHT/ABR) en plaatsen."
+        ),
+    },
+    {
+        "dataset": "bibliotheek",
+        "tool": "query_sparql_bibliotheek",
+        "topic": "library",
+        "browse": "https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek",
+        "key": "bibliotheek-article",
+        "uri": "https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek/graphs/article",
+        "description": (
+            "Bibliotheekcatalogus RCE, tijdschriftartikelen: 26.265 "
+            "sdo:Article, via sdo:isPartOf gekoppeld aan aflevering, jaargang "
+            "en tijdschrift."
+        ),
     },
 ]
 
@@ -222,5 +289,19 @@ def format_graphs() -> str:
                 "graph_name in resolve_concept_label()); een GRAPH-clause hiertegen "
                 "geeft stil 0 resultaten, zonder foutmelding."
             )
+
+    lines.append("")
+    lines.append(
+        "Andere RCE-datasets (eigen endpoint en eigen tool -- deze graphs "
+        "bestaan NIET op het CHO-endpoint van query_sparql() en zijn geen "
+        "geldige graph_name voor resolve_concept_label()):"
+    )
+    for row in OTHER_DATASET_GRAPH_ROWS:
+        lines.append(f"- {row['key']}: {row['uri']}")
+        lines.append(f"  {row['description']}")
+        lines.append(
+            f"  Bevraag met {row['tool']}() -- zie "
+            f"semantics_describe_topic('{row['topic']}'). Dataset: {row['browse']}"
+        )
 
     return "\n".join(lines)

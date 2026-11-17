@@ -23,7 +23,7 @@ Het doel is niet alleen het uitvoeren van SPARQL, maar betrouwbare interactie me
 
 ### Status
 
-Beta (v0.5.0-beta).
+Beta (v0.6.0-beta).
 
 Niet geaffilieerd met de Rijksdienst voor het Cultureel Erfgoed.
 
@@ -51,6 +51,9 @@ Niet geaffilieerd met de Rijksdienst voor het Cultureel Erfgoed.
 - Verkennen van daadwerkelijke querypaden van/naar een class via steekproeven, onafhankelijk van wat de ontologie declareert.
 - Automatische gemeente-resolutie en monumentenlijsten per gemeente, inclusief kadastrale oppervlakteberekening en een echte spatial join met het Kadaster.
 - Bevragen van de aparte RCE MASS-dataset voor maritiem erfgoed (scheepswrakken wereldwijd).
+- Bevragen van de aparte RCE-datasets Afbeeldingen (Beeldbank: foto's, tekeningen) en Bibliotheek (boeken en tijdschriftartikelen).
+- Standaard alleen kennis tonen die een formeel standpunt van de RCE is (`ceo:formeelStandpunt true`); niet-formele kennis alleen op verzoek, met vermelding. Uitzondering: bij de archeologische classes (onderzoeksgebied, vondstlocatie, vondsten, grondsporen, terrein, complex) heeft deze boolean geen betekenis en wordt kennis gewoon getoond.
+- Rekening houden met gemeentelijke herindelingen: opgeheven voorgangers van een gemeente worden meegeteld.
 
 ### Linked Data-filosofie
 
@@ -136,10 +139,11 @@ Validatiechecks omvatten onder meer:
 - `ORDER BY` gecombineerd met `OPTIONAL`-joins, wat consistent een HTTP 504 veroorzaakt op dit endpoint
 - meerdere onafhankelijke `OPTIONAL`-blokken in één query, wat een cartesisch product oplevert in plaats van losse feiten
 - een rijksmonument-/complex-/gezicht-/werelderfgoednummer dat via `CONCAT()` direct in een CHO-URI-pad wordt geplakt (dat padsegment is het interne `cultuurhistorischObjectnummer`, niet dat nummer)
+- een kennispad met gemengde `ceo:formeelStandpunt`-waarden (`ceo:heeftOmschrijving`, `ceo:heeftType`, `ceo:heeftGebeurtenis`, `ceo:heeftStijlEnCultuur`, `ceo:heeftMateriaal`, `ceo:heeftKennisregistratie`) dat zonder `ceo:formeelStandpunt` wordt gebruikt
 
-**Uitvoering:** `query_sparql`, `query_sparql_json`, `query_sparql_geojson`, `query_sparql_mass`, `convert_rd_to_wgs84`
+**Uitvoering:** `query_sparql`, `query_sparql_json`, `query_sparql_geojson`, `query_sparql_mass`, `query_sparql_afbeeldingen`, `query_sparql_bibliotheek`, `convert_rd_to_wgs84`
 
-`query_sparql` geeft leesbare tekst terug met geclassificeerde foutcodes bij falen. `query_sparql_json` geeft ruwe SPARQL JSON terug voor agents, tabellen, benchmarks en vervolgverwerking. `query_sparql_geojson` converteert SELECT-resultaten met een WKT-geometrievariabele naar een GeoJSON FeatureCollection. `query_sparql_mass` bevraagt de aparte RCE MASS-dataset (maritiem erfgoed, eigen schema.org-achtige vocabulaire) in plaats van het CHO-endpoint — zie `semantics_describe_topic('maritime')`. `convert_rd_to_wgs84` converteert een enkel RD New-coördinatenpaar (EPSG:28992) naar WGS84.
+`query_sparql` geeft leesbare tekst terug met geclassificeerde foutcodes bij falen. `query_sparql_json` geeft ruwe SPARQL JSON terug voor agents, tabellen, benchmarks en vervolgverwerking. `query_sparql_geojson` converteert SELECT-resultaten met een WKT-geometrievariabele naar een GeoJSON FeatureCollection. `query_sparql_mass` bevraagt de aparte RCE MASS-dataset (maritiem erfgoed, eigen schema.org-achtige vocabulaire) in plaats van het CHO-endpoint — zie `semantics_describe_topic('maritime')`. `query_sparql_afbeeldingen` bevraagt de aparte dataset Afbeeldingen (Beeldbank RCE, graph `photos`) en `query_sparql_bibliotheek` de aparte dataset Bibliotheek (graphs `books` en `article`), beide met schema.org-vocabulaire — zie `semantics_describe_topic('images')` en `semantics_describe_topic('library')`. `convert_rd_to_wgs84` converteert een enkel RD New-coördinatenpaar (EPSG:28992) naar WGS84.
 
 **Endpoints.** Standaard gaan queries naar het "Speedy"-endpoint (standaardconform SPARQL 1.1, en het endpoint dat GeoSPARQL-functies zoals `geof:area()` daadwerkelijk ondersteunt). Als dat endpoint onbereikbaar is of een gateway-foutmelding geeft (502/503/504), probeert `execute_sparql()` automatisch één keer opnieuw tegen het "Virtuoso"-endpoint. Welk van de twee endpoints de hierboven genoemde query-eigenaardigheden (GROUP BY-overflow, ORDER BY+OPTIONAL-504, geof:sfWithin-timeout) exact geeft, is niet per-endpoint herverifieerd; de validator waarschuwt er hoe dan ook voor. Override met de omgevingsvariabelen `SPARQL_ENDPOINT` en `SPARQL_FALLBACK_ENDPOINT`.
 
@@ -213,7 +217,7 @@ The goal is not only SPARQL execution, but reliable interaction with Dutch cultu
 
 ### Status
 
-Beta (v0.5.0-beta).
+Beta (v0.6.0-beta).
 
 Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
 
@@ -241,6 +245,9 @@ Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
 - Explore actual query paths from/to a class via sampling, independent of what the ontology declares.
 - Automatic municipality resolution and per-municipality monument lists, including cadastral area calculation and a real spatial join with the Cadastre.
 - Query the separate RCE MASS dataset for maritime heritage (shipwrecks worldwide).
+- Query the separate RCE datasets Afbeeldingen (image library: photos, drawings) and Bibliotheek (books and journal articles).
+- By default only show knowledge that is a formal position of the RCE (`ceo:formeelStandpunt true`); non-formal knowledge only on request, and labelled as such. Exception: for the archaeological classes (research area, find location, finds, features, site, complex) this boolean carries no meaning and knowledge is shown as is.
+- Account for municipal mergers: abolished predecessors of a municipality are included in counts.
 
 ### Linked Data philosophy
 
@@ -326,10 +333,11 @@ Validation checks include:
 - `ORDER BY` combined with `OPTIONAL` joins, which causes a consistent HTTP 504 on this endpoint
 - multiple independent `OPTIONAL` blocks in one query, which produces a cartesian product instead of separate facts
 - a rijksmonument/complex/gezicht/werelderfgoed number pasted directly into a CHO URI path via `CONCAT()` (that path segment is the internal `cultuurhistorischObjectnummer`, not that number)
+- a knowledge path with mixed `ceo:formeelStandpunt` values (`ceo:heeftOmschrijving`, `ceo:heeftType`, `ceo:heeftGebeurtenis`, `ceo:heeftStijlEnCultuur`, `ceo:heeftMateriaal`, `ceo:heeftKennisregistratie`) used without `ceo:formeelStandpunt`
 
-**Execution:** `query_sparql`, `query_sparql_json`, `query_sparql_geojson`, `query_sparql_mass`, `convert_rd_to_wgs84`
+**Execution:** `query_sparql`, `query_sparql_json`, `query_sparql_geojson`, `query_sparql_mass`, `query_sparql_afbeeldingen`, `query_sparql_bibliotheek`, `convert_rd_to_wgs84`
 
-`query_sparql` returns readable text with classified error codes on failure. `query_sparql_json` returns raw SPARQL JSON for agents, tables, benchmarks and follow-up processing. `query_sparql_geojson` converts SELECT results with a WKT geometry variable into a GeoJSON FeatureCollection. `query_sparql_mass` queries the separate RCE MASS dataset (maritime heritage, its own schema.org-like vocabulary) instead of the CHO endpoint -- see `semantics_describe_topic('maritime')`. `convert_rd_to_wgs84` converts a single RD New (EPSG:28992) coordinate pair to WGS84.
+`query_sparql` returns readable text with classified error codes on failure. `query_sparql_json` returns raw SPARQL JSON for agents, tables, benchmarks and follow-up processing. `query_sparql_geojson` converts SELECT results with a WKT geometry variable into a GeoJSON FeatureCollection. `query_sparql_mass` queries the separate RCE MASS dataset (maritime heritage, its own schema.org-like vocabulary) instead of the CHO endpoint -- see `semantics_describe_topic('maritime')`. `query_sparql_afbeeldingen` queries the separate Afbeeldingen dataset (RCE image library, graph `photos`) and `query_sparql_bibliotheek` the separate Bibliotheek dataset (graphs `books` and `article`), both using schema.org vocabulary -- see `semantics_describe_topic('images')` and `semantics_describe_topic('library')`. `convert_rd_to_wgs84` converts a single RD New (EPSG:28992) coordinate pair to WGS84.
 
 **Endpoints.** By default, queries go to the "Speedy" endpoint (standards-compliant SPARQL 1.1, and the endpoint that actually supports GeoSPARQL functions such as `geof:area()`). If that endpoint is unreachable or returns a gateway-level error (502/503/504), `execute_sparql()` automatically retries once against the "Virtuoso" endpoint. Which of the two endpoints exactly produces the query quirks listed above (GROUP BY overflow, ORDER BY+OPTIONAL 504, geof:sfWithin timeout) has not been re-verified per endpoint; the validator warns regardless. Override with the `SPARQL_ENDPOINT` and `SPARQL_FALLBACK_ENDPOINT` environment variables.
 

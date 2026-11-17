@@ -6,8 +6,16 @@ from pydantic import Field
 from rce_cho_mcp.area import format_largest_by_area, largest_by_area
 from rce_cho_mcp.brk_spatial import _MAX_CANDIDATE_ROWS, format_percelen_via_spatial_join
 from rce_cho_mcp.brk_spatial import percelen_via_spatial_join as _percelen_via_spatial_join
-from rce_cho_mcp.config import MASS_SPARQL_ENDPOINT
-from rce_cho_mcp.gemeente import format_monumenten_in_gemeente
+from rce_cho_mcp.config import (
+    AFBEELDINGEN_SPARQL_ENDPOINT,
+    BIBLIOTHEEK_SPARQL_ENDPOINT,
+    MASS_SPARQL_ENDPOINT,
+)
+from rce_cho_mcp.gemeente import (
+    format_herindeling,
+    format_monumenten_in_gemeente,
+    gemeente_herindeling,
+)
 from rce_cho_mcp.gemeente import monumenten_in_gemeente as _monumenten_in_gemeente
 from rce_cho_mcp.gemeente import resolve_gemeente as _resolve_gemeente
 from rce_cho_mcp.graphs import format_graphs
@@ -55,7 +63,8 @@ def ping() -> str:
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 def graphs_list() -> str:
-    """Toon bekende CHO named graphs."""
+    """Toon bekende CHO named graphs, plus de graphs van de aparte
+    RCE-datasets Afbeeldingen en Bibliotheek (eigen endpoint en eigen tool)."""
     return format_graphs()
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
@@ -249,6 +258,17 @@ def resolve_gemeente(gemeente: str) -> str:
     combinatie "monumenten in gemeente X" (inclusief de juiste graph en een
     standaard juridische-statusfilter) kan monumenten_in_gemeente() vaak de
     handgeschreven query helemaal vervangen.
+
+    GEMEENTELIJKE HERINDELINGEN: de gemeentekoppeling in de RCE-data is bij
+    herindelingen niet volledig en niet altijd naar de juiste gemeente
+    omgezet (61 opgeheven gemeenten zijn nog in gebruik: Voorne aan Zee
+    heeft zelf 0 objecten, alle 448 actieve rijksmonumenten staan op
+    voorganger Westvoorne; afgevoerde objecten en archeologie staan vaak nog
+    op de oude gemeente -- geverifieerd 2026-11-17). Deze tool meldt daarom ook
+    of de gemeente is opgeheven (met einddatum en opvolger) en geeft de
+    URI's van opgeheven voorgangers. Neem die voorgangers mee in een
+    handgeschreven gemeentefilter (VALUES), anders mis je stil objecten. Zie
+    semantics_describe_topic('gemeenten').
     """
     result = _resolve_gemeente(gemeente)
     if "error" in result:
@@ -256,7 +276,18 @@ def resolve_gemeente(gemeente: str) -> str:
         if extra:
             return result["error"] + "\nKandidaten:\n" + "\n".join(extra)
         return result["error"]
-    return f"{result['naam']}: {result['uri']}"
+    lines = [f"{result['naam']}: {result['uri']}"]
+    try:
+        lines += format_herindeling(result["naam"], gemeente_herindeling(result["uri"]))
+    except (RuntimeError, OSError) as e:
+        # De URI zelf is al gevonden; de herindelingsgegevens zijn aanvullend
+        # en mogen de lookup niet laten mislukken (urllib-fouten zijn OSError).
+        lines.append(
+            "Herindelingsgegevens konden niet worden opgehaald "
+            f"({type(e).__name__}); controleer zelf op opgeheven voorgangers, "
+            "zie semantics_describe_topic('gemeenten')."
+        )
+    return "\n".join(lines)
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
@@ -267,6 +298,7 @@ def monumenten_in_gemeente(
     class_name: str = "Rijksmonument",
     monument_aard: str | None = None,
     limit: Annotated[int, Field(ge=1, le=LIST_MAX_LIMIT)] = 50,
+    inclusief_voorgangers: bool = True,
 ) -> str:
     """Tel en toon objecten in een gemeente, met automatische
     gemeente-resolutie, de juiste graph en (voor Rijksmonument) een
@@ -312,6 +344,18 @@ def monumenten_in_gemeente(
     limit: hoeveel rijen getoond worden in de steekproef (1-200); "Aantal"
     in het resultaat geldt voor de volledige gevonden set, niet alleen deze
     steekproef.
+    inclusief_voorgangers: standaard True. De gemeentekoppeling in de
+    RCE-data is bij herindelingen niet volledig omgezet, dus objecten hangen
+    soms nog aan een opgeheven gemeente (alle actieve rijksmonumenten van
+    Voorne aan Zee staan op Westvoorne; afgevoerde objecten en archeologische
+    objecten staan vaak nog op de oude gemeente). Met True
+    worden de volledig opgegane voorgangers van de gevraagde gemeente
+    meegeteld, met een uitsplitsing per gemeente in het resultaat. Een
+    voorganger die over meerdere gemeenten is verdeeld (bv. Haaren) wordt
+    nooit automatisch meegeteld maar wel apart gemeld. Zet op False om
+    alleen de letterlijk gevraagde gemeente te tellen. Neem de
+    herindelingsregels uit het resultaat over in je antwoord. Zie
+    semantics_describe_topic('gemeenten').
 
     Let op: dit filtert op de gemeente die RCE zelf aan het object koppelt
     (ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente) -- als die
@@ -326,6 +370,7 @@ def monumenten_in_gemeente(
             class_name=class_name,
             monument_aard=monument_aard,
             limit=limit,
+            inclusief_voorgangers=inclusief_voorgangers,
         )
     )
 
@@ -484,6 +529,18 @@ def query_sparql(
 ) -> str:
     """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint.
 
+    FORMEEL STANDPUNT: kennis over een object (omschrijving, type,
+    gebeurtenis/datering, stijl en cultuur, materiaal, ...) draagt de boolean
+    ceo:formeelStandpunt. Toon en gebruik standaard uitsluitend kennis met
+    ceo:formeelStandpunt true (bv. ?cho ceo:heeftOmschrijving ?k . ?k
+    ceo:formeelStandpunt true ; ceo:omschrijving ?tekst), en vermeld dat in
+    het antwoord. Kennis met false alleen op uitdrukkelijk verzoek, met
+    vermelding. UITZONDERING: voor de archeologische classes
+    ArcheologischOnderzoeksgebied, Vondstlocatie, Vondsten, Grondsporen,
+    ArcheologischTerrein en ArcheologischComplex heeft de boolean geen
+    betekenis -- filter daar niet op en toon de kennis gewoon, zonder
+    vermelding. Zie semantics_describe_topic('formeel_standpunt').
+
     Let op: skos:prefLabel-waarden zijn taalgetagd (bv. "Zwolle"@nl). Een
     FILTER die een labelvariabele vergelijkt met een kale string (FILTER(?label
     = "Zwolle") of FILTER(?label IN (...))) geeft stil 0 resultaten, zonder
@@ -587,6 +644,88 @@ def query_sparql_mass(
     query zelf ophaalt; zet ook in de SPARQL-query zelf een LIMIT.
     """
     data = post_sparql(MASS_SPARQL_ENDPOINT, sparql_query)
+    return format_results(data, max_rows=max_rows)
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+@sparql_text_errors()
+def query_sparql_afbeeldingen(
+    sparql_query: str,
+    max_rows: Annotated[int, Field(ge=1, le=10_000)] = 100,
+) -> str:
+    """Voer een SPARQL SELECT of ASK query uit op het RCE Afbeeldingen-endpoint
+    (Beeldbank: foto's, bouwtekeningen, prenten).
+
+    Gebruik deze tool, niet query_sparql(), voor vragen naar afbeeldingen:
+    foto's bij een rijksmonument, werk van een fotograaf, beelden van een
+    plaats of uit een periode. Dit is een aparte dataset
+    (https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen) met
+    schema.org-vocabulaire (PREFIX sdo: <https://schema.org/>), los van de
+    CEO-ontologie. Raadpleeg eerst semantics_describe_topic('images') voor
+    de querypaden voordat je zelf een pad verzint.
+
+    De hoofddata staat in de named graph
+    https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen/graphs/photos
+    (565.170 foto's, ~18,9 miljoen triples). Zet daar altijd een
+    GRAPH-restrictie op en een LIMIT in de query: brede GROUP BY-scans over
+    deze graph lopen in een timeout.
+
+    Koppeling met het CHO-endpoint: een foto verwijst via sdo:about naar de
+    rijksmonument-URI. Het getal in die URI is het
+    cultuurhistorischObjectnummer, niet het rijksmonumentnummer -- zoek de
+    URI eerst op met query_sparql() en gebruik hem daarna hier.
+
+    Vermeld bij het tonen van een afbeelding de maker en de licentie
+    (sdo:license, overwegend CC BY-SA).
+
+    Geen validate_query()-voorcontrole en geen fallback-endpoint; de
+    CHO-specifieke regels (ceo:-paden, taalgetagde labels, formeel standpunt)
+    gelden hier niet.
+
+    max_rows: beperkt alleen de weergave, niet wat de query zelf ophaalt.
+    """
+    data = post_sparql(AFBEELDINGEN_SPARQL_ENDPOINT, sparql_query)
+    return format_results(data, max_rows=max_rows)
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
+@sparql_text_errors()
+def query_sparql_bibliotheek(
+    sparql_query: str,
+    max_rows: Annotated[int, Field(ge=1, le=10_000)] = 100,
+) -> str:
+    """Voer een SPARQL SELECT of ASK query uit op het RCE Bibliotheek-endpoint
+    (catalogus: boeken en tijdschriftartikelen).
+
+    Gebruik deze tool, niet query_sparql(), voor literatuurvragen: welke
+    boeken of artikelen zijn er over een onderwerp, plaats, monument of van
+    een auteur. Dit is een aparte dataset
+    (https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek) met
+    schema.org-vocabulaire (PREFIX sdo: <https://schema.org/>), los van de
+    CEO-ontologie. Raadpleeg eerst semantics_describe_topic('library') voor
+    de querypaden voordat je zelf een pad verzint.
+
+    Twee named graphs:
+    https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek/graphs/books
+    (155.422 boeken) en
+    https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek/graphs/article
+    (26.265 artikelen). Zet altijd een GRAPH-restrictie op een van beide en
+    een LIMIT in de query.
+
+    Koppeling met de rest: onderwerpen (sdo:about) zijn deels CHT- en
+    ABR-concepten met dezelfde URI's als in de CHO-dataset -- vind de URI met
+    zoek_concept_termennetwerk(). Een deel van de titels verwijst naar een
+    rijksmonument via sdo:identifier met sdo:propertyID "rijksmonumentnummer".
+
+    Geef in het antwoord de catalogus-link (sdo:url) mee.
+
+    Geen validate_query()-voorcontrole en geen fallback-endpoint; de
+    CHO-specifieke regels (ceo:-paden, taalgetagde labels, formeel standpunt)
+    gelden hier niet.
+
+    max_rows: beperkt alleen de weergave, niet wat de query zelf ophaalt.
+    """
+    data = post_sparql(BIBLIOTHEEK_SPARQL_ENDPOINT, sparql_query)
     return format_results(data, max_rows=max_rows)
 
 

@@ -27,7 +27,12 @@ rce-verbetervoorstel / rce-sparql-patronen):
    ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente (zie brk_spatial.py,
    waar dit pad al gebruikt wordt om de KKG-perceelscan te beperken).
 
-monumenten_in_gemeente() combineert deze drie stappen in één aanroep, met
+4. RCE's gemeentekoppeling is bij gemeentelijke herindelingen niet volledig
+   omgezet naar de nieuwe gemeente (zie het commentaarblok "Gemeentelijke
+   herindelingen" verderop): een vraag naar de huidige gemeente moet daarom
+   ook de opgeheven voorgangers meenemen.
+
+monumenten_in_gemeente() combineert deze stappen in één aanroep, met
 dezelfde dubbeltellings-/timeoutvoorzorgen als largest_by_area() in area.py
 (DISTINCT op elk niveau, filteren/limiteren vóór de OPTIONAL-naam/nummer-
 joins in een binnenste subquery, zodat de bekende "ORDER BY + OPTIONAL"-
@@ -158,6 +163,226 @@ def _normalize_gemeente_naam(naam: str) -> str:
     return GEMEENTE_SUFFIX_RE.sub("", naam).strip()
 
 
+# ---------------------------------------------------------------------------
+# Gemeentelijke herindelingen
+#
+# ceo:heeftGemeente wijst ALTIJD naar een OWMS-gemeenteconcept (live
+# geverifieerd 2026-11-17: 273.835 triples, 402 verschillende gemeenten,
+# allemaal in de namespace http://standaarden.overheid.nl/owms/terms/ -- de
+# TOOI-graph wordt nergens als doel van heeftGemeente gebruikt). Die koppeling
+# is bij herindelingen NIET volledig en niet altijd naar de juiste gemeente
+# omgezet: 61 van die 402 gemeenten zijn inmiddels opgeheven (owms:endDate
+# gevuld), samen goed voor 5.091 BasisregistratieRelaties, verdeeld over
+# 1.065 Rijksmonument-objecten (58 opgeheven gemeenten), 1.793
+# ArcheologischOnderzoeksgebieden en 2.233 Vondstlocaties. Live geverifieerd
+# (2026-11-17), drie verschillende situaties:
+#   1. ACTIEVE rijksmonumenten (status "rijksmonument") zijn overal omgezet
+#      naar de huidige gemeente, met precies EEN uitzondering: Voorne aan Zee
+#      (sinds 2023-01-01) heeft zelf 0 objecten; alle 448 actieve
+#      rijksmonumenten van dat grondgebied staan op voorganger "Westvoorne"
+#      -- ook de ruim 350 met BAG-woonplaats Brielle en de 33 in
+#      Hellevoetsluis. Dat zijn alle 448 actieve rijksmonumenten die
+#      landelijk nog op een opgeheven gemeente staan.
+#   2. AFGEVOERDE objecten (status "geen rijksmonument") zijn NIET omgezet:
+#      617 stuks, verspreid over 58 opgeheven gemeenten (bv. Weesp 69,
+#      Boxmeer 41, Cuijk 13, en rijksmonumentnummer 10832 op Brielle).
+#   3. ARCHEOLOGIE (onderzoeksgebieden, vondstlocaties) is niet omgezet voor
+#      de herindelingen van 2021-01-01 t/m 2023-01-01: alle 4.026 objecten
+#      staan op gemeenten met einddatum 2020-12-31 t/m 2022-12-31.
+# Een vraag naar "monumenten in Voorne aan Zee" gaf daardoor stil 0, en een
+# vraag met juridische_status="alle"/"geen rijksmonument" of een
+# archeologische class mist zonder voorgangers een deel. De OWMS-graph zelf
+# bevat de benodigde relaties (owms:predecessor / owms:successor, 270 elk,
+# plus owms:endDate / owms:startDate), dus dit is zonder externe bron op te
+# lossen: tel de gevraagde gemeente plus haar opgeheven voorgangers samen.
+#
+# Beperking: een voorganger die over MEERDERE opvolgers is verdeeld (bv.
+# Haaren, 2020-12-31 -> Boxtel, Oisterwijk, Tilburg en Vught) is niet
+# eenduidig aan één opvolger toe te wijzen. Die wordt daarom NIET automatisch
+# meegeteld, maar wel apart gemeld (zie _select_voorgangers).
+#
+# Actualiteit: de laatste herindeling in zowel de OWMS-graph als de
+# TOOI-graph (register "gemeenten compleet", zichtdatum 2026-01-29) is die
+# van 2023-01-01 (Voorne aan Zee). Latere herindelingen staan er niet in en
+# worden hier dus ook niet herkend.
+# ---------------------------------------------------------------------------
+_OWMS_NS = "http://standaarden.overheid.nl/owms/terms/"
+
+
+def _select_voorgangers(start_uri: str, edges: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Bepaal welke voorgangers van start_uri veilig meegeteld kunnen worden.
+
+    edges: rijen {"kind", "voorganger", "naam", "einddatum", "aantal_opvolgers"}
+    -- elke rij is één owms:predecessor-relatie ergens in de (transitieve)
+    voorgangersboom van start_uri.
+
+    Retourneert (meetellen, gesplitst). Een voorganger met precies één
+    opvolger is volledig in die opvolger opgegaan en telt mee (en zijn eigen
+    voorgangers ook, recursief). Een voorganger met meerdere opvolgers is
+    verdeeld en komt in "gesplitst" -- daar wordt niet verder doorheen
+    gelopen, want ook alles daaronder is niet eenduidig toe te wijzen.
+    """
+    by_kind: dict[str, list[dict]] = {}
+    for edge in edges:
+        by_kind.setdefault(edge["kind"], []).append(edge)
+
+    meetellen: list[dict] = []
+    gesplitst: list[dict] = []
+    seen = {start_uri}
+    queue = [start_uri]
+    while queue:
+        current = queue.pop(0)
+        for edge in by_kind.get(current, []):
+            uri = edge["voorganger"]
+            if uri in seen:
+                continue
+            seen.add(uri)
+            if edge["aantal_opvolgers"] == 1:
+                meetellen.append(edge)
+                queue.append(uri)
+            else:
+                gesplitst.append(edge)
+    return meetellen, gesplitst
+
+
+def gemeente_herindeling(gemeente_uri: str) -> dict:
+    """Haal de herindelingsgeschiedenis van een OWMS-gemeente op.
+
+    Retourneert {"einddatum" (None als de gemeente nog bestaat),
+    "opvolgers": [{"uri", "naam"}] (directe opvolgers),
+    "voorgangers": [...] (volledig opgegane voorgangers, transitief --
+    veilig om mee te tellen), "gesplitste_voorgangers": [...] (verdeeld over
+    meerdere gemeenten -- niet eenduidig toe te wijzen)}.
+    """
+    status_query = f"""
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX owms: <{_OWMS_NS}>
+SELECT DISTINCT ?eind ?opv ?opvNaam WHERE {{
+  GRAPH <{_OWMS_GRAPH}> {{
+    {{ <{gemeente_uri}> owms:endDate ?eind }}
+    UNION
+    {{ <{gemeente_uri}> owms:successor ?opv . OPTIONAL {{ ?opv skos:prefLabel ?opvNaam }} }}
+  }}
+}}
+"""
+    einddatum = None
+    opvolgers: dict[str, dict] = {}
+    for row in _sparql_rows(execute_sparql(status_query, timeout=_QUERY_TIMEOUT)):
+        if "eind" in row:
+            einddatum = row["eind"]["value"]
+        if "opv" in row:
+            uri = row["opv"]["value"]
+            opvolgers[uri] = {"uri": uri, "naam": row.get("opvNaam", {}).get("value", uri)}
+
+    voorganger_query = f"""
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX owms: <{_OWMS_NS}>
+SELECT ?kind ?voorg ?naam ?eind (COUNT(DISTINCT ?opv) AS ?nOpv) WHERE {{
+  GRAPH <{_OWMS_GRAPH}> {{
+    <{gemeente_uri}> owms:predecessor* ?kind .
+    ?kind owms:predecessor ?voorg .
+    ?voorg owms:successor ?opv .
+    OPTIONAL {{ ?voorg skos:prefLabel ?naam }}
+    OPTIONAL {{ ?voorg owms:endDate ?eind }}
+  }}
+}}
+GROUP BY ?kind ?voorg ?naam ?eind
+"""
+    edges = [
+        {
+            "kind": row["kind"]["value"],
+            "voorganger": row["voorg"]["value"],
+            "naam": row.get("naam", {}).get("value", row["voorg"]["value"]),
+            "einddatum": row.get("eind", {}).get("value"),
+            "aantal_opvolgers": int(row["nOpv"]["value"]),
+        }
+        for row in _sparql_rows(execute_sparql(voorganger_query, timeout=_QUERY_TIMEOUT))
+    ]
+    meetellen, gesplitst = _select_voorgangers(gemeente_uri, edges)
+
+    def _public(edge: dict) -> dict:
+        return {
+            "uri": edge["voorganger"],
+            "naam": edge["naam"],
+            "einddatum": edge["einddatum"],
+            "aantal_opvolgers": edge["aantal_opvolgers"],
+        }
+
+    return {
+        "einddatum": einddatum,
+        "opvolgers": sorted(opvolgers.values(), key=lambda o: o["naam"]),
+        "voorgangers": sorted((_public(e) for e in meetellen), key=lambda o: o["naam"]),
+        "gesplitste_voorgangers": sorted(
+            (_public(e) for e in gesplitst), key=lambda o: o["naam"]
+        ),
+    }
+
+
+def huidige_gemeentenamen(gemeente_uri: str) -> list[str]:
+    """Geef de naam/namen van de nu bestaande gemeente(n) waarin een (mogelijk
+    opgeheven) OWMS-gemeente is opgegaan -- transitief via owms:successor.
+
+    Leeg resultaat betekent: de gemeente heeft geen opvolger en bestaat dus
+    nog gewoon onder zijn eigen naam. Gebruikt door brk_spatial.py: het
+    Kadaster KKG-endpoint kent alleen de huidige gemeentegebieden (live
+    geverifieerd 2026-11-17: imxgeo:naam "Voorne aan Zee" en "Dijk en Waard"
+    bestaan, "Brielle", "Weesp" en "Heerhugowaard" niet), terwijl RCE's
+    heeftGemeente nog naar de opgeheven gemeente kan wijzen.
+    """
+    query = f"""
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX owms: <{_OWMS_NS}>
+SELECT DISTINCT ?naam WHERE {{
+  GRAPH <{_OWMS_GRAPH}> {{
+    <{gemeente_uri}> owms:successor+ ?opv .
+    ?opv skos:prefLabel ?naam .
+    FILTER NOT EXISTS {{ ?opv owms:endDate ?eind }}
+  }}
+  FILTER(LANG(?naam) = "nl")
+}}
+"""
+    return sorted(
+        row["naam"]["value"]
+        for row in _sparql_rows(execute_sparql(query, timeout=_QUERY_TIMEOUT))
+    )
+
+
+def format_herindeling(naam: str, herindeling: dict) -> list[str]:
+    """Leesbare regels over de herindelingsstatus van een gemeente (leeg als
+    er niets te melden is). Gebruikt door de resolve_gemeente-tool."""
+    lines: list[str] = []
+    if herindeling["einddatum"]:
+        opvolgers = ", ".join(o["naam"] for o in herindeling["opvolgers"]) or "onbekend"
+        lines.append(
+            f"LET OP: gemeente {naam} is opgeheven per {herindeling['einddatum']} "
+            f"(opgegaan in: {opvolgers}). De RCE-data is bij herindelingen niet "
+            "volledig omgezet: er kunnen nog objecten aan deze oude gemeente "
+            "gekoppeld zijn (vooral afgevoerde objecten en archeologie), maar "
+            "actieve rijksmonumenten staan doorgaans op de opvolger of op een "
+            "andere voorganger daarvan. Vraag voor het hele huidige "
+            f"grondgebied {opvolgers} op met monumenten_in_gemeente()."
+        )
+    if herindeling["voorgangers"]:
+        namen = ", ".join(
+            f"{v['naam']} (tot {v['einddatum'] or '?'}): {v['uri']}"
+            for v in herindeling["voorgangers"]
+        )
+        lines.append(
+            f"Voorgangers, volledig opgegaan in {naam} -- neem deze URI's mee in "
+            f"een handgeschreven gemeentefilter (VALUES): {namen}"
+        )
+    if herindeling["gesplitste_voorgangers"]:
+        namen = ", ".join(
+            f"{v['naam']} (tot {v['einddatum'] or '?'}, verdeeld over "
+            f"{v['aantal_opvolgers']} gemeenten): {v['uri']}"
+            for v in herindeling["gesplitste_voorgangers"]
+        )
+        lines.append(
+            f"Gesplitste voorgangers, NIET eenduidig aan {naam} toe te wijzen: {namen}"
+        )
+    return lines
+
+
 def resolve_gemeente(naam: str) -> dict:
     """Resolveer een gemeentenaam naar zijn OWMS concept-URI.
 
@@ -213,6 +438,7 @@ def monumenten_in_gemeente(
     class_name: str = "Rijksmonument",
     monument_aard: str | None = None,
     limit: int = 50,
+    inclusief_voorgangers: bool = True,
 ) -> dict:
     """Tel en toon objecten in een gemeente, met automatische
     gemeente-resolutie, de juiste graph en (voor class_name="Rijksmonument")
@@ -235,8 +461,16 @@ def monumenten_in_gemeente(
     resultaten, de valkuil die dit filter voor niet-Rijksmonument classes
     voorheen had).
 
+    inclusief_voorgangers: tel (standaard) ook objecten mee die nog aan een
+    door herindeling opgeheven voorganger van deze gemeente gekoppeld zijn
+    -- RCE's heeftGemeente is bij herindelingen niet volledig omgezet (zie het
+    commentaarblok "Gemeentelijke herindelingen" in deze module).
+    Voorgangers die over meerdere gemeenten verdeeld zijn tellen nooit
+    automatisch mee, maar worden wel gemeld in "herindeling".
+
     Retourneert bij succes {"gemeente", "gemeente_uri", "class_name",
-    "class_uri", "juridische_status", "monument_aard", "aantal", "rows"}
+    "class_uri", "juridische_status", "monument_aard", "aantal", "rows",
+    "herindeling"}
     ("aantal" geldt voor de volledige set, "rows" is de steekproef tot
     limit), plus optioneel "waarschuwing" bij een class met een vrijwel lege
     gemeentekoppeling, of {"error": ...} bij een onbekende
@@ -301,19 +535,63 @@ def monumenten_in_gemeente(
             }
         aard_filter = f"?obj ceo:heeftMonumentAard <{aard_uri}> ."
 
+    herindeling = gemeente_herindeling(gem["uri"])
+    meegeteld = [{"uri": gem["uri"], "naam": gem["naam"], "einddatum": herindeling["einddatum"]}]
+    if inclusief_voorgangers:
+        meegeteld += [
+            {"uri": v["uri"], "naam": v["naam"], "einddatum": v["einddatum"]}
+            for v in herindeling["voorgangers"]
+        ]
+    gesplitst = [
+        {"uri": v["uri"], "naam": v["naam"], "einddatum": v["einddatum"]}
+        for v in herindeling["gesplitste_voorgangers"]
+    ]
+
+    gemeente_values = " ".join(f"<{g['uri']}>" for g in meegeteld)
+    object_pattern = f"""VALUES ?gem {{ {gemeente_values} }}
+        ?obj a <{class_uri}> ;
+          ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente ?gem .
+        {status_filter}
+        {aard_filter}"""
+
     count_query = f"""
 PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
 SELECT (COUNT(DISTINCT ?obj) AS ?aantal) WHERE {{
   GRAPH <{_INSTANTIES_GRAPH}> {{
-    ?obj a <{class_uri}> ;
-      ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente <{gem['uri']}> .
-    {status_filter}
-    {aard_filter}
+        {object_pattern}
   }}
 }}
 """
     count_rows = _sparql_rows(execute_sparql(count_query, timeout=_QUERY_TIMEOUT))
     aantal = int(count_rows[0]["aantal"]["value"]) if count_rows else 0
+
+    # Uitsplitsing per gemeente, alleen nodig als er meer dan één gemeente in
+    # het spel is. De gesplitste voorgangers gaan hier wel in mee (zodat de
+    # aanroeper ziet hoeveel objecten daar nog op staan), maar tellen niet
+    # mee in "aantal" hierboven.
+    if len(meegeteld) + len(gesplitst) > 1:
+        alle_values = " ".join(f"<{g['uri']}>" for g in meegeteld + gesplitst)
+        per_gemeente_query = f"""
+PREFIX ceo: <https://linkeddata.cultureelerfgoed.nl/def/ceo#>
+SELECT ?gem (COUNT(DISTINCT ?obj) AS ?aantal) WHERE {{
+  GRAPH <{_INSTANTIES_GRAPH}> {{
+        VALUES ?gem {{ {alle_values} }}
+        ?obj a <{class_uri}> ;
+          ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente ?gem .
+        {status_filter}
+        {aard_filter}
+  }}
+}}
+GROUP BY ?gem
+"""
+        per_gemeente = {
+            row["gem"]["value"]: int(row["aantal"]["value"])
+            for row in _sparql_rows(execute_sparql(per_gemeente_query, timeout=_QUERY_TIMEOUT))
+        }
+    else:
+        per_gemeente = {gem["uri"]: aantal}
+    for g in meegeteld + gesplitst:
+        g["aantal"] = per_gemeente.get(g["uri"], 0)
 
     # build_name_lookup_query() wrapt dit met de standaard naam/nummer-
     # OPTIONALs op de al-beperkte set (zie queries.py) -- zelfde tweetraps-
@@ -322,10 +600,7 @@ SELECT (COUNT(DISTINCT ?obj) AS ?aantal) WHERE {{
     inner_select = f"""{{
     SELECT DISTINCT ?obj WHERE {{
       GRAPH <{_INSTANTIES_GRAPH}> {{
-        ?obj a <{class_uri}> ;
-          ceo:heeftBasisregistratieRelatie/ceo:heeftGemeente <{gem['uri']}> .
-        {status_filter}
-        {aard_filter}
+        {object_pattern}
       }}
     }}
     LIMIT {limit}
@@ -355,11 +630,78 @@ SELECT (COUNT(DISTINCT ?obj) AS ?aantal) WHERE {{
         "monument_aard": monument_aard,
         "aantal": aantal,
         "rows": rows,
+        "herindeling": {
+            "einddatum": herindeling["einddatum"],
+            "opvolgers": herindeling["opvolgers"],
+            "gemeenten_meegeteld": meegeteld,
+            "gesplitste_voorgangers": gesplitst,
+            "voorgangers_niet_meegeteld": (
+                [] if inclusief_voorgangers else herindeling["voorgangers"]
+            ),
+        },
     }
     sparse_note = _GEMEENTE_LINK_SPARSE_NOTES.get(class_name)
     if sparse_note is not None:
         result["waarschuwing"] = sparse_note
     return result
+
+
+def _format_herindeling_result(result: dict) -> list[str]:
+    """Regels over herindelingen voor format_monumenten_in_gemeente()."""
+    her = result.get("herindeling")
+    if not her:
+        return []
+    naam = result["gemeente"]
+    lines: list[str] = []
+
+    if her["einddatum"]:
+        opvolgers = ", ".join(o["naam"] for o in her["opvolgers"]) or "onbekend"
+        lines.append(
+            f"LET OP (herindeling): gemeente {naam} is opgeheven per "
+            f"{her['einddatum']} en opgegaan in {opvolgers}. Dit resultaat telt "
+            f"alleen wat RCE nog aan de oude gemeente {naam} koppelt -- dat is "
+            "meestal een restant, en kan 0 zijn terwijl er wel monumenten in "
+            f"het voormalige {naam} liggen. Vraag voor het hele huidige "
+            f"grondgebied {opvolgers} op."
+        )
+
+    meegeteld = her["gemeenten_meegeteld"]
+    if len(meegeteld) > 1:
+        delen = ", ".join(
+            g["naam"]
+            + (f" (opgeheven {g['einddatum']})" if g["einddatum"] else "")
+            + f": {g['aantal']}"
+            for g in meegeteld
+        )
+        lines.append(
+            "Herindeling: de gemeentekoppeling in de RCE-data is bij "
+            "herindelingen niet volledig (en niet altijd naar de juiste "
+            "gemeente) omgezet, daarom zijn de opgeheven voorgangers "
+            f"meegeteld. Onder welke gemeente de objecten nu geregistreerd staan -- {delen}. "
+            "Deze uitsplitsing zegt waar RCE het object aan koppelt, niet in "
+            "welke voormalige gemeente het feitelijk ligt."
+        )
+
+    if her["voorgangers_niet_meegeteld"]:
+        namen = ", ".join(v["naam"] for v in her["voorgangers_niet_meegeteld"])
+        lines.append(
+            f"LET OP (herindeling): {naam} heeft opgeheven voorgangers ({namen}) "
+            "die NIET zijn meegeteld (inclusief_voorgangers=False). Objecten "
+            "die RCE nog aan die oude gemeenten koppelt ontbreken hier."
+        )
+
+    if her["gesplitste_voorgangers"]:
+        delen = ", ".join(
+            f"{g['naam']} (opgeheven {g['einddatum'] or '?'}): {g['aantal']}"
+            for g in her["gesplitste_voorgangers"]
+        )
+        lines.append(
+            "LET OP (herindeling): de volgende voorgangers zijn over meerdere "
+            f"gemeenten verdeeld en daarom NIET meegeteld -- {delen}. Een deel "
+            f"van die objecten ligt nu in {naam}; bepaal dat zo nodig per object "
+            "via de geometrie (ceo:heeftGeometrie)."
+        )
+    return lines
 
 
 def format_monumenten_in_gemeente(result: dict) -> str:
@@ -385,6 +727,7 @@ def format_monumenten_in_gemeente(result: dict) -> str:
         f"Aantal: {result['aantal']}",
         f"Gemeente-URI: {result['gemeente_uri']}",
     ]
+    lines += _format_herindeling_result(result)
     if "waarschuwing" in result:
         lines.append(f"WAARSCHUWING: {result['waarschuwing']}")
     lines += [
