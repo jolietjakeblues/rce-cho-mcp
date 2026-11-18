@@ -29,9 +29,9 @@ from rce_cho_mcp.ontology.api import (
 from rce_cho_mcp.prompts import WORKFLOW_INSTRUCTIONS
 from rce_cho_mcp.references import format_references
 from rce_cho_mcp.resolver import describe_resource, resolve_label
+from rce_cho_mcp.routing import MixedEndpointsError, execute_routed, routing_note
 from rce_cho_mcp.semantics import format_topic, format_topics
 from rce_cho_mcp.sparql import (
-    execute_sparql,
     format_results,
     post_sparql,
     rd_to_wgs84,
@@ -546,6 +546,18 @@ def query_sparql(
 ) -> str:
     """Voer een SPARQL SELECT of ASK query uit op het RCE CHO endpoint.
 
+    ANDERE DATASETS: gebruikt de query een GRAPH van de datasets
+    Afbeeldingen (.../rce/afbeeldingen/graphs/photos), Bibliotheek
+    (.../rce/bibliotheek/graphs/books of .../graphs/article) of MASS, dan
+    wordt hij automatisch op dat endpoint uitgevoerd; het resultaat meldt
+    dat. Je kunt foto's en literatuur dus ook met deze tool bevragen als
+    query_sparql_afbeeldingen() / query_sparql_bibliotheek() niet beschikbaar
+    zijn -- zet er wel de GRAPH-clause bij. Eén query kan niet graphs van
+    verschillende endpoints combineren (foutcode MIXED_ENDPOINTS) en
+    SERVICE-federatie werkt niet: haal eerst op CHO de URI's of nummers op
+    en gebruik die in een VALUES-lijst in een tweede query. Zie
+    semantics_describe_topic('images') en ('library').
+
     FORMEEL STANDPUNT: kennis over een object (omschrijving, type,
     gebeurtenis/datering, stijl en cultuur, materiaal, ...) draagt de boolean
     ceo:formeelStandpunt. Toon en gebruik standaard uitsluitend kennis met
@@ -587,8 +599,14 @@ def query_sparql(
     monumenten. validate_query_structured() waarschuwt hiervoor als je een
     query zonder kleine LIMIT met geo:asWKT probeert.
     """
-    data = execute_sparql(sparql_query)
-    return format_results(data, max_rows=max_rows)
+    try:
+        data, dataset = execute_routed(sparql_query)
+    except MixedEndpointsError as e:
+        return f"[MIXED_ENDPOINTS] {e}"
+    text = format_results(data, max_rows=max_rows)
+    if dataset != "cho":
+        text = f"{routing_note(dataset)}\n\n{text}"
+    return text
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_dict_errors
@@ -602,7 +620,13 @@ def query_sparql_json(sparql_query: str) -> dict:
     halen, of wrap de vergelijking in STR(). Gebruik validate_query_structured()
     om dit patroon vooraf te laten controleren.
     """
-    return execute_sparql(sparql_query)
+    try:
+        data, dataset = execute_routed(sparql_query)
+    except MixedEndpointsError as e:
+        return {"error": "MIXED_ENDPOINTS", "advies": str(e)}
+    if dataset != "cho":
+        data = {**data, "_endpoint_note": routing_note(dataset)}
+    return data
 
 @mcp.tool(annotations={"readOnlyHint": True, "idempotentHint": True})
 @sparql_dict_errors
@@ -629,7 +653,10 @@ def query_sparql_geojson(
     Gebruik geo:asWKT in de query om geometrieën op te halen. Voeg toe aan de query:
     PREFIX geo: <http://www.opengis.net/ont/geosparql#>
     """
-    data = execute_sparql(sparql_query)
+    try:
+        data, _dataset = execute_routed(sparql_query)
+    except MixedEndpointsError as e:
+        return {"error": "MIXED_ENDPOINTS", "advies": str(e)}
     return to_geojson(data, wkt_var=wkt_var, convert_rd=convert_rd)
 
 

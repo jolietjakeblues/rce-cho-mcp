@@ -23,7 +23,7 @@ Het doel is niet alleen het uitvoeren van SPARQL, maar betrouwbare interactie me
 
 ### Status
 
-Beta (v0.6.0-beta).
+Beta (v0.6.1-beta).
 
 Niet geaffilieerd met de Rijksdienst voor het Cultureel Erfgoed.
 
@@ -108,7 +108,7 @@ Het RCE linked data-ecosysteem bestaat uit meerdere lagen.
 | Afbeeldingen | <https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/afbeeldingen/sparql` | `query_sparql_afbeeldingen` |
 | Bibliotheek | <https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/bibliotheek/sparql` | `query_sparql_bibliotheek` |
 
-Elke dataset heeft in de frontend een SPARQL-editor op `<frontend-URL>/sparql`. Voor CHO gebruikt de server daarnaast een fallback-endpoint: `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql`.
+`query_sparql` herkent een `GRAPH`-clause op een graph van Afbeeldingen, Bibliotheek of MASS en voert de query dan automatisch op dat endpoint uit; de aparte tools zijn dus niet strikt nodig. Elke dataset heeft in de frontend een SPARQL-editor op `<frontend-URL>/sparql`. Voor CHO gebruikt de server daarnaast een fallback-endpoint: `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql`.
 
 **CEO-ontologie**
 
@@ -240,7 +240,7 @@ The goal is not only SPARQL execution, but reliable interaction with Dutch cultu
 
 ### Status
 
-Beta (v0.6.0-beta).
+Beta (v0.6.1-beta).
 
 Not affiliated with the Rijksdienst voor het Cultureel Erfgoed.
 
@@ -325,7 +325,7 @@ The RCE linked data ecosystem consists of several layers.
 | Afbeeldingen | <https://linkeddata.cultureelerfgoed.nl/rce/afbeeldingen> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/afbeeldingen/sparql` | `query_sparql_afbeeldingen` |
 | Bibliotheek | <https://linkeddata.cultureelerfgoed.nl/rce/bibliotheek> | `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/bibliotheek/sparql` | `query_sparql_bibliotheek` |
 
-Each dataset has a SPARQL editor in the frontend at `<frontend URL>/sparql`. For CHO the server also uses a fallback endpoint: `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql`.
+`query_sparql` recognises a `GRAPH` clause on a graph of Afbeeldingen, Bibliotheek or MASS and then runs the query on that endpoint automatically, so the dedicated tools are not strictly required. Each dataset has a SPARQL editor in the frontend at `<frontend URL>/sparql`. For CHO the server also uses a fallback endpoint: `https://api.linkeddata.cultureelerfgoed.nl/datasets/rce/cho/services/cho/sparql`.
 
 **CEO ontology**
 
