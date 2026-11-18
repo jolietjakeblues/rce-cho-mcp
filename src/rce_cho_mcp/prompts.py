@@ -40,6 +40,14 @@ query_sparql_afbeeldingen() na semantics_describe_topic('images'). Gaat de
 vraag over literatuur (boeken, tijdschriftartikelen)? Gebruik
 query_sparql_bibliotheek() na semantics_describe_topic('library'). Ook dit
 zijn aparte datasets met een eigen endpoint en schema.org-vocabulaire.
+Heb je die twee tools niet? Gebruik dan gewoon query_sparql() met de
+GRAPH-clause van de dataset (.../rce/afbeeldingen/graphs/photos,
+.../rce/bibliotheek/graphs/books of .../graphs/article): query_sparql()
+herkent de graph en voert de query automatisch op het juiste endpoint uit.
+Concludeer dus nooit dat deze data onbereikbaar is. Combineer in één query
+geen graphs van verschillende endpoints en gebruik geen SERVICE-federatie
+(werkt niet): werk in twee stappen, eerst CHO, dan met een VALUES-lijst de
+andere dataset.
 
 Vraagt de gebruiker waar de data vandaan komt, of wil hij de data, een
 query of de ontologie zelf bekijken? Gebruik verwijzingen() voor de links

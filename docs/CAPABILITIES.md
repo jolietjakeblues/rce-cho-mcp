@@ -259,6 +259,10 @@ Huidige tools:
   graphs `.../graphs/books` en `.../graphs/article`): boeken en tijdschriftartikelen met
   onderwerpen (CHT/ABR), plaatsen en rijksmonumentnummers
 
+`query_sparql` herkent een `GRAPH`-clause op een van deze graphs en voert de query dan
+automatisch op het juiste endpoint uit; graphs van verschillende endpoints zijn niet in
+één query te combineren (foutcode `MIXED_ENDPOINTS`).
+
 Raadpleeg `semantics_describe_topic('images')` resp. `semantics_describe_topic('library')`
 voor de querypaden. `graphs_list` toont deze graphs in een aparte sectie, omdat ze niet op
 het CHO-endpoint bestaan.

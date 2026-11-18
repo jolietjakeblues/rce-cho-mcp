@@ -292,15 +292,18 @@ def format_graphs() -> str:
 
     lines.append("")
     lines.append(
-        "Andere RCE-datasets (eigen endpoint en eigen tool -- deze graphs "
-        "bestaan NIET op het CHO-endpoint van query_sparql() en zijn geen "
-        "geldige graph_name voor resolve_concept_label()):"
+        "Andere RCE-datasets (eigen endpoint en eigen tool). Deze graphs "
+        "staan niet op het CHO-endpoint, maar query_sparql() herkent ze: een "
+        "query met een GRAPH-clause op een van deze IRI's wordt automatisch "
+        "op het juiste endpoint uitgevoerd. Ze zijn geen geldige graph_name "
+        "voor resolve_concept_label(), en zijn niet in een enkele query te "
+        "combineren met CHO-graphs:"
     )
     for row in OTHER_DATASET_GRAPH_ROWS:
         lines.append(f"- {row['key']}: {row['uri']}")
         lines.append(f"  {row['description']}")
         lines.append(
-            f"  Bevraag met {row['tool']}() -- zie "
+            f"  Bevraag met {row['tool']}() of met query_sparql() + GRAPH <deze IRI> -- zie "
             f"semantics_describe_topic('{row['topic']}'). Dataset: {row['browse']}"
         )
 
